@@ -1466,8 +1466,11 @@ document.getElementById('loop-export').addEventListener('click', async e => {
   }
   if (!currentFile) { showToast('沒有影片檔案'); return; }
 
+  // Warn for large files on iOS
   const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent);
-  if (isIOS) { showToast('iOS 不支援，請在電腦上使用'); return; }
+  if (isIOS && currentFile.size > 500 * 1024 * 1024) {
+    showToast('檔案過大，iOS 可能記憶體不足');
+  }
 
   exportCancelled = false;
   exportOverlay.classList.add('show');
