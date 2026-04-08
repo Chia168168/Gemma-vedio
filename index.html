@@ -1498,11 +1498,11 @@ document.getElementById('loop-export').addEventListener('click', async e => {
     const dur = (loopOut - loopIn).toFixed(3);
 
     await ffmpegInstance.run(
-      '-i', inName,
       '-ss', ss,
+      '-i', inName,
       '-t', dur,
-      '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '18',
-      '-c:a', 'aac', '-b:a', '128k',
+      '-c', 'copy',
+      '-avoid_negative_ts', 'make_zero',
       '-movflags', '+faststart',
       'clip.mp4'
     );
