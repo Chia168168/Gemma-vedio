@@ -1487,6 +1487,8 @@ document.getElementById('loop-export').addEventListener('click', async e => {
 
     const ss  = loopIn.toFixed(3);
     const dur = (loopOut - loopIn).toFixed(3);
+    const outExt = ext.toLowerCase() === 'mov' ? 'mov' : 'mp4';
+    const outName = 'clip.' + outExt;
 
     await ffmpegInstance.run(
       '-ss', ss,
@@ -1495,9 +1497,8 @@ document.getElementById('loop-export').addEventListener('click', async e => {
       '-map', '0:v:0',
       '-map', '0:a:0?',
       '-c', 'copy',
-      '-avoid_negative_ts', 'make_zero',
-      '-movflags', '+faststart',
-      'clip.mp4'
+      '-reset_timestamps', '1',
+      outName
     );
 
     if (exportCancelled) { exportOverlay.classList.remove('show'); return; }
@@ -1505,18 +1506,18 @@ document.getElementById('loop-export').addEventListener('click', async e => {
     exportStatus.textContent = '輸出中…';
     exportProgressF.style.width = '95%';
 
-    const data = ffmpegInstance.FS('readFile', 'clip.mp4');
-    const blob = new Blob([data.buffer], { type: 'video/mp4' });
+    const data = ffmpegInstance.FS('readFile', outName);
+    const blob = new Blob([data.buffer], { type: outExt === 'mov' ? 'video/quicktime' : 'video/mp4' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
     const base = currentFile.name.replace(/\.[^.]+$/, '') || 'clip';
     a.href = url;
-    a.download = `${base}_clip_${ss.replace('.','_')}.mp4`;
+    a.download = `${base}_clip_${ss.replace('.','_')}.${outExt}`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 3000);
 
     try { ffmpegInstance.FS('unlink', inName); } catch(e) {}
-    try { ffmpegInstance.FS('unlink', 'clip.mp4'); } catch(e) {}
+    try { ffmpegInstance.FS('unlink', outName); } catch(e) {}
 
     exportProgressF.style.width = '100%';
     exportStatus.textContent = '完成！';
