@@ -380,6 +380,16 @@
   #loop-export:active { opacity: 0.6; }
   #loop-export:disabled { opacity: 0.3; cursor: not-allowed; }
 
+  #export-format {
+    background: transparent; border: 1.5px solid rgba(255,255,255,0.2);
+    border-radius: 100px; padding: 5px 8px;
+    color: rgba(255,255,255,0.6); font-family: 'DM Mono', monospace;
+    font-size: 12px; cursor: pointer; flex-shrink: 0;
+    -webkit-appearance: none; appearance: none;
+    text-align: center;
+  }
+  #export-format option { background: #1a1a1a; color: #fff; }
+
   /* Export progress overlay */
   #export-overlay {
     display: none;
@@ -581,6 +591,11 @@
       <button id="loop-set-out">OUT</button>
       <button id="loop-clear">✕</button>
       <button id="loop-toggle">⟲ 循環</button>
+      <select id="export-format">
+        <option value="original">原格式</option>
+        <option value="mp4">MP4</option>
+        <option value="mov">MOV</option>
+      </select>
       <button id="loop-export">✂ 剪輯</button>
       <div id="loop-range-display">—</div>
     </div>
@@ -1487,27 +1502,50 @@ document.getElementById('loop-export').addEventListener('click', async e => {
 
     const ss  = loopIn.toFixed(3);
     const dur = (loopOut - loopIn).toFixed(3);
-    const outExt = ext.toLowerCase() === 'mov' ? 'mov' : 'mp4';
+    const formatSel = document.getElementById('export-format').value;
+    const srcExt = ext.toLowerCase();
+    const outExt = formatSel === 'original' ? srcExt
+                 : formatSel;
     const outName = 'clip.' + outExt;
+    const needsReencode = outExt !== srcExt;
 
-    await ffmpegInstance.run(
-      '-ss', ss,
-      '-i', inName,
-      '-t', dur,
-      '-map', '0:v:0',
-      '-map', '0:a:0?',
-      '-c', 'copy',
-      '-reset_timestamps', '1',
-      outName
-    );
+    if (needsReencode) {
+      // Format conversion: re-encode
+      await ffmpegInstance.run(
+        '-i', inName,
+        '-ss', ss,
+        '-t', dur,
+        '-map', '0:v:0',
+        '-map', '0:a:0?',
+        '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '18',
+        '-c:a', 'aac', '-b:a', '128k',
+        '-movflags', '+faststart',
+        outName
+      );
+    } else {
+      // Same format: fast copy
+      await ffmpegInstance.run(
+        '-i', inName,
+        '-ss', ss,
+        '-t', dur,
+        '-map', '0:v:0',
+        '-map', '0:a:0?',
+        '-c', 'copy',
+        '-movflags', '+faststart',
+        outName
+      );
+    }
 
     if (exportCancelled) { exportOverlay.classList.remove('show'); return; }
 
     exportStatus.textContent = '輸出中…';
     exportProgressF.style.width = '95%';
 
+    const mimeType = outExt === 'mov' ? 'video/quicktime'
+                   : outExt === 'mp4' ? 'video/mp4'
+                   : 'video/' + outExt;
     const data = ffmpegInstance.FS('readFile', outName);
-    const blob = new Blob([data.buffer], { type: outExt === 'mov' ? 'video/quicktime' : 'video/mp4' });
+    const blob = new Blob([data.buffer], { type: mimeType });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
     const base = currentFile.name.replace(/\.[^.]+$/, '') || 'clip';
