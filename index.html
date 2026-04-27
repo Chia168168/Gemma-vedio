@@ -466,7 +466,7 @@
 
 <!-- Upload -->
 <div id="upload-screen">
-  <div class="logo">Video Frame Player 4/27</div>
+  <div class="logo">Video Frame Player</div>
   <div class="upload-zone">
     <input type="file" id="file-input" accept="video/*">
     <div class="upload-icon">
@@ -1533,12 +1533,13 @@ document.getElementById('loop-export').addEventListener('click', async e => {
         outName
       );
     } else {
-      // Both -ss and -to as INPUT options: snaps start AND end to nearest keyframes
+      // -ss/-to as input options snap to keyframes; -t as output trims trailing blank
       const toTime = loopOut.toFixed(3);
       await ffmpegInstance.run(
         '-ss', ss,
         '-to', toTime,
         '-i', inName,
+        '-t', dur,
         '-map', '0:v:0',
         '-map', '0:a:0?',
         '-c', 'copy',
