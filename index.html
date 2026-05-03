@@ -1195,7 +1195,7 @@ async function extractClipBlob(file, clipIn, clipOut) {
   // ── parse video track ──
   const vt = parseVideoTrackFull(moovU8.buffer);
   if (!vt || !vt.stco.length) throw new Error('找不到視訊軌');
-  const { timescale, stts, stsc, stco, stsz, stss, fixedSampleSize } = vt;
+  const { timescale, stts, stsc, stco, stsz, stss, ctts, fixedSampleSize } = vt;
   const TC = stco.length;
 
   function spc(ci) {
@@ -1480,7 +1480,7 @@ function parseVideoTrackFull(moovBuf) {
 
 function parseTrakFull(view, start, end) {
   let timescale = null, isVideo = false;
-  let stts = [], stsc = [], stco = [], stsz = [], stss = [], fixedSampleSize = 0;
+  let stts = [], stsc = [], stco = [], stsz = [], stss = [], ctts = [], fixedSampleSize = 0;
 
   function walk(s, e) {
     let off = s;
@@ -1524,12 +1524,17 @@ function parseTrakFull(view, start, end) {
         for (let i = 0; i < cnt && cs + 8 + i*4 + 3 < ce; i++)
           stss.push(readU32(view, cs+8+i*4) - 1); // convert to 0-based
       }
+      else if (nm === 'ctts') {
+        const cnt = readU32(view, cs + 4);
+        for (let i = 0; i < cnt && cs + 8 + i*8 + 7 < ce; i++)
+          ctts.push({ count: readU32(view, cs+8+i*8), offset: readU32(view, cs+8+i*8+4) });
+      }
       off += sz;
     }
   }
   walk(start, end);
   if (!isVideo || !timescale) return null;
-  return { timescale, stts, stsc, stco, stsz, stss, fixedSampleSize, isVideo };
+  return { timescale, stts, stsc, stco, stsz, stss, ctts, fixedSampleSize, isVideo };
 }
 
 function seekExact(t) {
@@ -2158,11 +2163,14 @@ window.addEventListener('load', () => {
         document.body.appendChild(inp);
         inp.addEventListener('change', async () => {
           const file = inp.files[0];
-          inp.remove();
-          if (!file) return;
+          if (!file) { inp.remove(); return; }
           if (file.name !== p.fileName || file.size !== p.fileSize) {
+            inp.remove();
             showToast('請選擇同一支影片：' + p.fileName); return;
           }
+          // Keep inp in DOM until loadVideoFile completes — removing it too early
+          // invalidates the File object on iOS Safari
+          inp.style.display = 'none';
           loadVideoFile(file);
           video.addEventListener('canplay', async function once() {
             video.removeEventListener('canplay', once);
@@ -2173,6 +2181,7 @@ window.addEventListener('load', () => {
             updateLoopOverlay();
             document.getElementById('export-format').value = p.format || 'original';
             await new Promise(r => setTimeout(r, 500));
+            inp.remove(); // safe to remove now
             window._resumeSkipSizeCheck = true;
             document.getElementById('loop-export').click();
           }, { once: true });
