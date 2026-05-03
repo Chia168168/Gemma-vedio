@@ -1226,21 +1226,7 @@ async function extractClipBlob(file, clipIn, clipOut) {
   let c1=c0; for(let c=c0;c<TC;c++){c1=c; if(css[c]+spc(c)>=s1)break;}
 
   let clipS0 = css[c0], clipS1 = Math.min(s1, css[c1]+spc(c1));
-
-  // ── build trimmed tables ──
-  // stts
-  const newStts = [];
-  { let si=0; for(const e of stts){
-    const a=Math.max(si,clipS0), b=Math.min(si+e.count,clipS1);
-    if(b>a) newStts.push([b-a, e.delta]);
-    si+=e.count; if(si>=clipS1)break;
-  }}
-  // stsc
-  const newStsc=[]; for(let c=0;c<CC;c++){const n=spc(c0+c); if(!newStsc.length||n!==newStsc[newStsc.length-1][1]) newStsc.push([c+1,n,1]);}
-  // stsz
-  const newStsz = fixedSampleSize>0 ? null : Array.from({length:clipS1-clipS0},(_,i)=>ss(clipS0+i));
-  // clip duration ticks
-  let clipTicks=0; for(const [cnt,dlt] of newStts) clipTicks+=cnt*dlt;
+  // trimmed tables will be computed after keyframe snap below
 
   function mkStts() {
     const b = new Uint8Array(8 + newStts.length*8); w32(b,4,newStts.length);
@@ -1333,6 +1319,17 @@ async function extractClipBlob(file, clipIn, clipOut) {
   byteEnd = Math.min(byteEnd, file.size);
   const mdat = new Uint8Array(await readFileSlice(file, byteStart, byteEnd));
   const CC = c1-c0+1;
+
+  // ── build trimmed tables (after snap so clipS0/clipS1/CC are final) ──
+  const newStts = [];
+  { let si=0; for(const e of stts){
+    const a=Math.max(si,clipS0), b=Math.min(si+e.count,clipS1);
+    if(b>a) newStts.push([b-a, e.delta]);
+    si+=e.count; if(si>=clipS1)break;
+  }}
+  const newStsc=[]; for(let c=0;c<CC;c++){const n=spc(c0+c); if(!newStsc.length||n!==newStsc[newStsc.length-1][1]) newStsc.push([c+1,n,1]);}
+  const newStsz = fixedSampleSize>0 ? null : Array.from({length:clipS1-clipS0},(_,i)=>ss(clipS0+i));
+  let clipTicks=0; for(const [cnt,dlt] of newStts) clipTicks+=cnt*dlt;
 
   // Trim stss to clip sample range, re-index from 1
   function mkStss() {
