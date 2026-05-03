@@ -1284,7 +1284,7 @@ async function extractClipBlob(file, clipIn, clipOut) {
         else if (nm === 'ctts') {
           const cnt = readU32(vv, cs + 4);
           for (let i = 0; i < cnt && cs + 8 + i*8 + 7 < ce2; i++)
-            origCtts.push({ count: readU32(vv, cs + 8 + i*8), offset: readU32(vv, cs + 8 + i*8 + 4) });
+            origCtts.push({ count: readU32(vv, cs + 8 + i*8), offset: vv.getInt32(cs + 8 + i*8 + 4, false) }); // signed!
         }
         off += sz;
       }
@@ -1356,8 +1356,14 @@ async function extractClipBlob(file, clipIn, clipOut) {
     }
     if (!result.length) return null;
     const b = new Uint8Array(8 + result.length * 8);
+    w32(b, 0, 1); // version 1 supports signed offsets
     w32(b, 4, result.length);
-    result.forEach((e, i) => { w32(b, 8 + i*8, e.count); w32(b, 8 + i*8 + 4, e.offset); });
+    result.forEach((e, i) => {
+      w32(b, 8 + i*8, e.count);
+      // write signed int32 big-endian
+      const dv = new DataView(b.buffer, b.byteOffset + 8 + i*8 + 4, 4);
+      dv.setInt32(0, e.offset, false);
+    });
     return box('ctts', b);
   }
 
@@ -1566,21 +1572,39 @@ async function generateThumbnails() {
   const tw = Math.round(H * aspect);
   const count = Math.max(6, Math.round(W / tw));
 
+  // iOS Safari: seeked fires before frame is painted.
+  // Use requestVideoFrameCallback if available, else double-rAF delay.
+  function waitForFrame() {
+    return new Promise(resolve => {
+      if (video.requestVideoFrameCallback) {
+        video.requestVideoFrameCallback(resolve);
+      } else {
+        requestAnimationFrame(() => requestAnimationFrame(resolve));
+      }
+    });
+  }
+
+  // Ensure video is paused and at a decodable state
+  const wasPlaying = !video.paused;
+  video.pause();
+
   for (let i = 0; i < count; i++) {
     try {
-      await seekExact((i / count) * duration);
+      const t = (i / count) * duration;
+      await seekExact(t);
+      await waitForFrame(); // wait for frame to actually paint
+
       const c = document.createElement('canvas');
       c.width = tw; c.height = H;
       c.getContext('2d').drawImage(video, 0, 0, tw, H);
       c.style.cssText = `width:${tw}px;height:${H}px;flex-shrink:0;`;
       thumbCanvasStrip.appendChild(c);
-    } catch(e) {
-      // Skip this frame if seek fails
-    }
+    } catch(e) {}
   }
 
   thumbStatus.style.display = 'none';
   try { await seekExact(0); } catch(e) {}
+  if (wasPlaying) video.play();
   updateUI();
 }
 
