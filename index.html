@@ -3,11 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>iPhone 影片剪輯器 (內置核心版)</title>
-    
-    <!-- 基礎組件：若這也失敗，請確認手機是否有連網 -->
-    <script src="https://unpkg.com/mp4box@0.5.2/dist/mp4box.all.min.js"></script>
-
+    <title>影片剪輯器 (相容模式)</title>
     <style>
         body { font-family: -apple-system, sans-serif; background: #f2f2f7; padding: 20px; display: flex; justify-content: center; }
         .card { background: white; border-radius: 20px; padding: 25px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
@@ -15,7 +11,7 @@
         input, button { width: 100%; margin-bottom: 15px; padding: 14px; border-radius: 12px; border: 1px solid #d1d1d6; font-size: 16px; box-sizing: border-box; }
         button { background: #007aff; color: white; border: none; font-weight: 600; cursor: pointer; }
         button:disabled { background: #c7c7cc; }
-        #status { font-size: 14px; color: #3a3a3c; background: #f9f9f9; padding: 15px; border-radius: 10px; min-height: 60px; line-height: 1.6; white-space: pre-wrap; }
+        #status { font-size: 14px; color: #3a3a3c; background: #fdfdfd; padding: 15px; border-radius: 10px; border: 1px solid #eee; line-height: 1.6; }
         .success { color: #34c759; font-weight: bold; }
         .error { color: #ff3b30; font-weight: bold; }
     </style>
@@ -23,56 +19,64 @@
 <body>
 
 <div class="card">
-    <h2>影片剪輯器</h2>
+    <h2>影片 剪輯器</h2>
+    <div id="status">檢查環境中...</div>
+    <hr style="border:0; border-top:1px solid #eee; margin:20px 0;">
+    
     <input type="file" id="videoInput" accept="video/mp4,video/quicktime">
     <div style="display:flex; gap:10px;">
         <input type="number" id="startTime" placeholder="秒" value="0">
         <input type="number" id="endTime" placeholder="秒" value="5">
     </div>
-    <button id="startBtn">開始剪輯</button>
-    <div id="status">正在啟動內置引擎...</div>
+    <button id="startBtn" disabled>環境未就緒</button>
+    <button id="retryBtn" style="background:#5856d6; display:none;">手動嘗試修復</button>
 </div>
 
-<!-- 關鍵：直接內嵌 Mp4Muxer 的 UMD 代碼，消除下載失敗的可能性 -->
+<!-- 分開載入，避免互相干擾 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mp4box/0.5.2/mp4box.all.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mp4-muxer@3.3.0/dist/mp4-muxer.main.js"></script>
 
 <script>
     const btn = document.getElementById('startBtn');
+    const retryBtn = document.getElementById('retryBtn');
     const statusEl = document.getElementById('status');
 
-    function checkReady() {
-        // 同時檢查兩種可能的掛載點
-        const muxer = window.Mp4Muxer;
-        const mp4box = window.MP4Box;
+    function check() {
+        const hasBox = typeof MP4Box !== 'undefined';
+        const hasMuxer = typeof Mp4Muxer !== 'undefined';
 
-        if (muxer && mp4box) {
-            statusEl.innerHTML = '<span class="success">✅ 引擎啟動成功！\n請選擇影片並輸入秒數。</span>';
+        if (hasBox && hasMuxer) {
+            statusEl.innerHTML = '<span class="success">✅ 環境已就緒，可以開始剪輯！</span>';
+            btn.disabled = false;
+            btn.innerText = "開始剪輯";
+            retryBtn.style.display = 'none';
             return true;
+        } else {
+            let errorMsg = "❌ 載入失敗：";
+            if (!hasBox) errorMsg += "[MP4Box 缺失] ";
+            if (!hasMuxer) errorMsg += "[Muxer 缺失] ";
+            statusEl.innerHTML = `<span class="error">${errorMsg}</span><br>請確認是否使用 Safari 或更換網路環境。`;
+            retryBtn.style.display = 'block';
+            return false;
         }
-        return false;
     }
 
-    // 每 0.5 秒強行檢查一次，直到成功為止
-    const retry = setInterval(() => {
-        if (checkReady()) clearInterval(retry);
-    }, 500);
+    // 點擊手動修復會嘗試重新插入標籤
+    retryBtn.onclick = () => {
+        location.reload();
+    };
 
-    // 如果 5 秒後還沒成功，切換到備援顯示
-    setTimeout(() => {
-        if (!checkReady()) {
-            statusEl.innerHTML = '<span class="error">❌ 組件載入被瀏覽器封鎖。\n請點擊右上角「...」選擇「在 Safari 中開啟」。</span>';
-        }
-    }, 5000);
+    window.onload = () => setTimeout(check, 1000);
 
     btn.onclick = async () => {
         const file = document.getElementById('videoInput').files[0];
-        if (!file) return alert("請選擇影片檔案");
+        if (!file) return alert("請選影片");
 
         const startT = parseFloat(document.getElementById('startTime').value);
         const endT = parseFloat(document.getElementById('endTime').value);
         
         btn.disabled = true;
-        statusEl.innerText = "讀取中，請稍候...";
+        statusEl.innerText = "正在裁切中，請稍候...";
 
         try {
             const mp4boxfile = MP4Box.createFile();
@@ -117,7 +121,7 @@
                 buffer.fileStart = offset;
                 mp4boxfile.appendBuffer(buffer);
                 offset += buffer.byteLength;
-                statusEl.innerText = `剪輯進度: ${Math.round((offset / file.size) * 100)}%`;
+                statusEl.innerText = `進度: ${Math.round((offset / file.size) * 100)}%`;
             }
 
             mp4boxfile.flush();
@@ -127,16 +131,15 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `cut_${Math.floor(Date.now()/1000)}.mp4`;
+            a.download = `cut.mp4`;
             a.click();
-            statusEl.innerHTML = '<span class="success">✅ 剪輯完成！檔案已存至下載項目。</span>';
+            statusEl.innerHTML = '<span class="success">✅ 剪輯成功！</span>';
         } catch (err) {
-            statusEl.innerHTML = `<span class="error">處理失敗: ${err.message}</span>`;
+            statusEl.innerHTML = `<span class="error">失敗: ${err.message}</span>`;
         } finally {
             btn.disabled = false;
         }
     };
 </script>
-
 </body>
 </html>
