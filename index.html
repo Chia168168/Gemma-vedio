@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>iPhone 影片剪輯器</title>
+    <title>iPhone 影片剪輯器 (終極穩定版)</title>
     
-    <!-- 使用不同的 CDN 節點以確保穩定性 -->
-    <script src="https://unpkg.com/mp4box@0.5.2/dist/mp4box.all.min.js"></script>
-    <script src="https://unpkg.com/mp4-muxer@3.3.0/dist/mp4-muxer.main.js"></script>
+    <!-- 僅保留一個絕對穩定的基礎組件 -->
+    <script src="https://cdn.jsdelivr.net/npm/mp4box@0.5.2/dist/mp4box.all.min.js"></script>
 
     <style>
         body { font-family: -apple-system, sans-serif; background: #f2f2f7; padding: 20px; display: flex; justify-content: center; }
@@ -16,7 +15,7 @@
         input, button { width: 100%; margin-bottom: 15px; padding: 14px; border-radius: 12px; border: 1px solid #d1d1d6; font-size: 16px; box-sizing: border-box; -webkit-appearance: none; }
         button { background: #007aff; color: white; border: none; font-weight: 600; cursor: pointer; }
         button:disabled { background: #c7c7cc; }
-        #status { font-size: 14px; color: #3a3a3c; background: #f9f9f9; padding: 15px; border-radius: 10px; min-height: 60px; white-space: pre-wrap; line-height: 1.6; }
+        #status { font-size: 14px; color: #3a3a3c; background: #f9f9f9; padding: 15px; border-radius: 10px; min-height: 60px; line-height: 1.6; }
         .success { color: #34c759; font-weight: bold; }
         .error { color: #ff3b30; font-weight: bold; }
     </style>
@@ -24,46 +23,37 @@
 <body>
 
 <div class="card">
-    <h2>影片 剪輯器</h2>
+    <h2>影片剪輯器</h2>
     <input type="file" id="videoInput" accept="video/mp4,video/quicktime">
     <div style="display:flex; gap:10px;">
-        <input type="number" id="startTime" placeholder="秒" value="0">
-        <input type="number" id="endTime" placeholder="秒" value="5">
+        <input type="number" id="startTime" placeholder="開始(秒)" value="0">
+        <input type="number" id="endTime" placeholder="結束(秒)" value="5">
     </div>
-    <button id="startBtn">開始剪輯</button>
-    <div id="status">初始化中...</div>
+    <button id="startBtn">確認並開始剪輯</button>
+    <div id="status">正在檢查基礎組件...</div>
 </div>
 
-<script>
+<script type="module">
+    // 直接在模組內導入，這在 GitHub Pages 的 HTTPS 環境下最保險
+    // 這樣它會被綁定在當前腳本，不依賴全域變數
+    import { Muxer, ArrayBufferTarget } from 'https://cdn.jsdelivr.net/npm/mp4-muxer@3.3.0/+esm';
+
     const btn = document.getElementById('startBtn');
     const statusEl = document.getElementById('status');
 
-    // 強制檢查函式庫是否到位
+    // 檢查核心是否載入
     function checkEnv() {
-        const mp4boxReady = typeof MP4Box !== 'undefined';
-        // 某些版本中 Mp4Muxer 會被掛在 window.Mp4Muxer 下
-        const muxerReady = typeof Mp4Muxer !== 'undefined';
-
-        if (mp4boxReady && muxerReady) {
-            statusEl.innerHTML = '<span class="success">✅ 組件已就緒\n請選取影片開始處理</span>';
+        if (typeof MP4Box !== 'undefined') {
+            statusEl.innerHTML = '<span class="success">✅ 環境準備就緒</span>';
             return true;
-        } else {
-            let msg = "❌ 載入失敗原因：\n";
-            if (!mp4boxReady) msg += "- MP4Box 腳本未執行\n";
-            if (!muxerReady) msg += "- Mp4Muxer 變數未定義\n";
-            msg += "\n請嘗試：\n1. 確認網路連線\n2. 使用 Safari 開啟\n3. 重新整理頁面";
-            statusEl.innerHTML = `<span class="error">${msg}</span>`;
-            return false;
         }
+        statusEl.innerHTML = '<span class="error">❌ MP4Box 載入失敗，請重新整理</span>';
+        return false;
     }
 
-    // 立即檢查並在 2 秒後再次確認
-    window.onload = checkEnv;
-    setTimeout(checkEnv, 2000);
+    checkEnv();
 
     btn.onclick = async () => {
-        if (!checkEnv()) return;
-
         const file = document.getElementById('videoInput').files[0];
         if (!file) return alert("請選取影片");
 
@@ -71,16 +61,18 @@
         const endT = parseFloat(document.getElementById('endTime').value);
         
         btn.disabled = true;
-        statusEl.innerText = "正在處理串流，請稍候...";
+        statusEl.innerText = "正在分析影片串流...";
 
         try {
             const mp4boxfile = MP4Box.createFile();
-            const target = new Mp4Muxer.ArrayBufferTarget();
+            const target = new ArrayBufferTarget();
             let muxer = null;
 
             mp4boxfile.onReady = (info) => {
                 const videoTrack = info.videoTracks[0];
-                muxer = new Mp4Muxer.Muxer({
+                
+                // 直接使用導入的 Muxer
+                muxer = new Muxer({
                     target: target,
                     video: {
                         codec: videoTrack.codec.startsWith('avc1') ? 'avc' : 'hevc',
@@ -117,22 +109,23 @@
                 buffer.fileStart = offset;
                 mp4boxfile.appendBuffer(buffer);
                 offset += buffer.byteLength;
-                statusEl.innerText = `進度: ${Math.round((offset / file.size) * 100)}%`;
+                statusEl.innerText = `處理進度: ${Math.round((offset / file.size) * 100)}%`;
             }
 
             mp4boxfile.flush();
             if (muxer) muxer.finalize();
 
-            statusEl.innerText = "儲存中...";
+            statusEl.innerText = "完成！正在產生下載檔案...";
             const blob = new Blob([target.buffer], { type: 'video/mp4' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             a.download = `cut_${Date.now()}.mp4`;
             a.click();
-            statusEl.innerHTML = '<span class="success">✅ 剪輯成功！</span>';
+            statusEl.innerHTML = '<span class="success">✅ 剪輯成功！請查看下載清單。</span>';
         } catch (err) {
             statusEl.innerHTML = `<span class="error">停止原因: ${err.message}</span>`;
+            console.error(err);
         } finally {
             btn.disabled = false;
         }
