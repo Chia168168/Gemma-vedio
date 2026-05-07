@@ -2,78 +2,93 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>iPhone 剪輯終極版</title>
-    <!-- 嘗試從多個來源載入 MP4Box -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>iPhone 影片快速剪輯</title>
+    <!-- 1. 引入 MP4Box -->
     <script src="https://unpkg.com/mp4box@0.5.2/dist/mp4box.all.min.js"></script>
-    <!-- 嘗試從多個來源載入 Mp4Muxer -->
-    <script src="https://unpkg.com/mp4-muxer@3.3.0/dist/mp4-muxer.main.js"></script>
+    <!-- 2. 引入 mp4-muxer (UMD 版本) -->
+    <script src="https://cdn.jsdelivr.net/npm/mp4-muxer@3.3.0/dist/mp4-muxer.main.js"></script>
     
     <style>
-        body { font-family: -apple-system, sans-serif; padding: 20px; background: #f2f2f7; text-align: center; }
-        .card { background: white; border-radius: 15px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 400px; margin: auto; }
-        input, button { width: 100%; margin-top: 15px; padding: 12px; box-sizing: border-box; border-radius: 10px; border: 1px solid #ddd; font-size: 16px; }
-        button { background: #007aff; color: white; font-weight: bold; border: none; -webkit-appearance: none; }
-        #status { margin-top: 15px; font-size: 13px; color: #333; background: #fff; padding: 10px; border: 1px solid #eee; border-radius: 5px; text-align: left; min-height: 40px; }
-        .error { color: red !important; font-weight: bold; }
+        body { font-family: -apple-system, sans-serif; padding: 20px; background: #f2f2f7; line-height: 1.5; }
+        .card { background: white; border-radius: 20px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); max-width: 450px; margin: auto; }
+        h3 { margin-top: 0; color: #1c1c1e; }
+        input[type="file"] { width: 100%; margin: 15px 0; border: 1px solid #ddd; padding: 10px; border-radius: 8px; box-sizing: border-box; }
+        .row { display: flex; gap: 10px; margin-bottom: 20px; }
+        .row div { flex: 1; }
+        label { font-size: 12px; color: #8e8e93; display: block; margin-bottom: 5px; }
+        input[type="number"] { width: 100%; padding: 12px; border: 1px solid #d1d1d6; border-radius: 10px; box-sizing: border-box; font-size: 16px; }
+        button { background: #007aff; color: white; border: none; width: 100%; padding: 16px; border-radius: 14px; font-size: 17px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        button:active { background: #0056b3; }
+        #status { margin-top: 15px; font-size: 13px; color: #3a3a3c; text-align: left; background: #f9f9f9; padding: 12px; border-radius: 10px; min-height: 40px; border: 1px solid #eee; }
+        .err { color: #ff3b30; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h3>大檔案 影片剪輯</h3>
-    <p style="font-size: 12px; color: #666;">支援 200MB+ / 純前端處理</p>
-    
+    <h3>影片剪輯 (無 200M 限制)</h3>
+    <label>步驟 1：選擇影片</label>
     <input type="file" id="videoInput" accept="video/mp4,video/quicktime">
     
-    <div style="display: flex; gap: 10px;">
-        <input type="number" id="startTime" placeholder="開始(秒)" value="0">
-        <input type="number" id="endTime" placeholder="結束(秒)" value="10">
+    <div class="row">
+        <div>
+            <label>開始時間 (秒)</label>
+            <input type="number" id="startTime" value="0" step="0.1">
+        </div>
+        <div>
+            <label>結束時間 (秒)</label>
+            <input type="number" id="endTime" value="10" step="0.1">
+        </div>
     </div>
 
-    <button id="startBtn">確認並剪輯</button>
-    <div id="status">狀態：等待環境檢測...</div>
+    <button id="startBtn">開始剪輯</button>
+    <div id="status">狀態：等待檔案...</div>
 </div>
 
 <script>
-    const status = document.getElementById('status');
     const btn = document.getElementById('startBtn');
+    const status = document.getElementById('status');
 
-    // 1. 環境檢測：確認函式庫是否成功載入
-    window.onload = () => {
-        let errorMsg = "";
-        if (typeof MP4Box === 'undefined') errorMsg += "❌ MP4Box 載入失敗\n";
-        if (typeof Mp4Muxer === 'undefined') errorMsg += "❌ Mp4Muxer 載入失敗\n";
-        
-        if (errorMsg) {
-            status.innerHTML = `<span class="error">${errorMsg}</span>請檢查網路或更換瀏覽器。`;
-        } else {
-            status.innerText = "✅ 環境檢測正常，請選取檔案。";
-        }
-    };
+    // 檢查全域變數名稱 (重要修復)
+    function getMuxerClass() {
+        if (typeof Mp4Muxer !== 'undefined') return Mp4Muxer;
+        if (window.Mp4Muxer) return window.Mp4Muxer;
+        return null;
+    }
 
     btn.onclick = async () => {
+        const LibMp4Muxer = getMuxerClass();
+        if (!LibMp4Muxer) {
+            status.innerHTML = '<span class="err">錯誤：找不到 Mp4Muxer 函式庫，請檢查網路連線。</span>';
+            return;
+        }
+
         const file = document.getElementById('videoInput').files[0];
+        if (!file) {
+            alert("請先選取影片");
+            return;
+        }
+
         const startT = parseFloat(document.getElementById('startTime').value);
         const endT = parseFloat(document.getElementById('endTime').value);
-
-        if (!file) return alert("請先選取影片檔案");
         
-        status.innerText = "正在分析影片並啟動串流...";
         btn.disabled = true;
+        status.innerText = "正在分析影片結構...";
 
         try {
-            // 檢查是否為 HTTPS (iPhone 必要條件)
-            if (!file.stream) throw new Error("此 API 僅支援 HTTPS 連線，請更換網址。");
+            if (!file.stream) throw new Error("請確保在 HTTPS 環境下執行以使用 Stream API");
 
             const mp4boxfile = MP4Box.createFile();
             let muxer = null;
-            let target = new Mp4Muxer.ArrayBufferTarget();
+            let target = new LibMp4Muxer.ArrayBufferTarget();
 
             mp4boxfile.onReady = (info) => {
                 const videoTrack = info.videoTracks[0];
-                // 初始化封裝器
-                muxer = new Mp4Muxer.Muxer({
+                status.innerText = "結構分析成功，正在提取影格...";
+
+                // 使用修正後的類別名稱初始化
+                muxer = new LibMp4Muxer.Muxer({
                     target: target,
                     video: {
                         codec: videoTrack.codec.startsWith('avc1') ? 'avc' : 'hevc',
@@ -101,7 +116,7 @@
                 }
             };
 
-            // 串流讀取檔案防止 200MB 崩潰
+            // 串流處理：這是 iPhone 處理 200MB+ 的核心
             const reader = file.stream().getReader();
             let offset = 0;
             while (true) {
@@ -111,13 +126,13 @@
                 buffer.fileStart = offset;
                 mp4boxfile.appendBuffer(buffer);
                 offset += buffer.byteLength;
-                status.innerText = `讀取中: ${Math.round((offset/file.size)*100)}%`;
+                status.innerText = `處理進度: ${Math.round((offset/file.size)*100)}%`;
             }
 
             mp4boxfile.flush();
             if (muxer) muxer.finalize();
 
-            status.innerText = "剪輯完成，準備存檔...";
+            status.innerText = "剪輯完成！正在準備下載...";
             const blob = new Blob([target.buffer], { type: 'video/mp4' });
             const url = URL.createObjectURL(blob);
             
@@ -126,11 +141,11 @@
             a.download = `clip_${Date.now()}.mp4`;
             a.click();
             
-            status.innerText = "✅ 成功！影片已存入相簿/下載項目。";
+            status.innerText = "✅ 完成！檔案已下載至「檔案」App 或相簿。";
 
         } catch (err) {
-            status.innerHTML = `<span class="error">停止原因: ${err.message}</span>`;
             console.error(err);
+            status.innerHTML = `<span class="err">停止原因: ${err.message}</span>`;
         } finally {
             btn.disabled = false;
         }
