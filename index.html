@@ -4,8 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>iPhone 影片剪輯器</title>
-    <!-- 僅保留一個核心載入點 -->
-    <script src="https://cdn.jsdelivr.net/npm/mp4box@0.5.2/dist/mp4box.all.min.js"></script>
+    
+    <!-- 1. 使用傳統同步載入，避免 import 失敗 -->
+    <script src="https://cdn.jsdelivr.net/npm/mp4box@0.5.2/dist/mp4box.all.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mp4-muxer@3.3.0/dist/mp4-muxer.main.js" crossorigin="anonymous"></script>
+
     <style>
         body { font-family: -apple-system, sans-serif; background: #f2f2f7; padding: 20px; display: flex; justify-content: center; }
         .card { background: white; border-radius: 20px; padding: 25px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
@@ -15,58 +18,55 @@
         button:disabled { background: #c7c7cc; }
         #status { font-size: 14px; color: #3a3a3c; background: #f9f9f9; padding: 15px; border-radius: 10px; min-height: 60px; word-break: break-all; border: 1px solid #eee; line-height: 1.6; }
         .success { color: #34c759; font-weight: bold; }
+        .error { color: #ff3b30; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h2>影片 剪輯器</h2>
+    <h2>影片剪輯器</h2>
     <input type="file" id="videoInput" accept="video/mp4,video/quicktime">
     <div style="display:flex; gap:10px;">
-        <div>
-            <label style="font-size: 12px; color: #888;">開始(秒)</label>
-            <input type="number" id="startTime" value="0">
-        </div>
-        <div>
-            <label style="font-size: 12px; color: #888;">結束(秒)</label>
-            <input type="number" id="endTime" value="5">
-        </div>
+        <input type="number" id="startTime" placeholder="開始(秒)" value="0">
+        <input type="number" id="endTime" placeholder="結束(秒)" value="5">
     </div>
     <button id="startBtn">開始剪輯</button>
-    <div id="status">正在載入組件...</div>
+    <div id="status">正在初始化環境...</div>
 </div>
 
-<script type="module">
-    // 透過 ESM 載入 Mp4Muxer，並確保它在載入成功後才顯示準備就緒
-    import * as Mp4Muxer from 'https://cdn.jsdelivr.net/npm/mp4-muxer@3.3.0/+esm';
-
+<script>
     const btn = document.getElementById('startBtn');
     const statusEl = document.getElementById('status');
 
-    // 檢查 MP4Box 是否就緒
-    const checkEnv = () => {
-        if (typeof MP4Box !== 'undefined') {
-            statusEl.innerHTML = '<span class="success">✅ 環境準備就緒，請選擇影片。</span>';
-            return true;
-        }
-        return false;
-    };
+    // 檢查全域變數是否存在
+    function checkLibraries() {
+        const hasMP4Box = typeof MP4Box !== 'undefined';
+        const hasMuxer = typeof Mp4Muxer !== 'undefined';
 
-    if (!checkEnv()) {
-        let timer = setInterval(() => {
-            if (checkEnv()) clearInterval(timer);
-        }, 500);
+        if (hasMP4Box && hasMuxer) {
+            statusEl.innerHTML = '<span class="success">✅ 環境已就緒，請選擇影片</span>';
+            return true;
+        } else {
+            statusEl.innerHTML = `<span class="error">❌ 載入失敗<br>MP4Box: ${hasMP4Box?'OK':'缺失'}<br>Mp4Muxer: ${hasMuxer?'OK':'缺失'}</span>`;
+            return false;
+        }
     }
 
+    // 頁面載入後與 2 秒後各檢查一次，因應網路延遲
+    window.onload = checkLibraries;
+    setTimeout(checkLibraries, 2000);
+
     btn.onclick = async () => {
+        if (!checkLibraries()) return alert("組件尚未載入，請重新整理頁面。");
+
         const file = document.getElementById('videoInput').files[0];
-        if (!file) return alert("請先選擇影片");
+        if (!file) return alert("請選取影片");
 
         const startT = parseFloat(document.getElementById('startTime').value);
         const endT = parseFloat(document.getElementById('endTime').value);
         
         btn.disabled = true;
-        statusEl.innerText = "正在分析影片 (請勿切換分頁)...";
+        statusEl.innerText = "正在讀取影片串流...";
 
         try {
             const mp4boxfile = MP4Box.createFile();
@@ -74,10 +74,7 @@
             const target = new Mp4Muxer.ArrayBufferTarget();
 
             mp4boxfile.onReady = (info) => {
-                // 優先尋找影像軌
                 const videoTrack = info.videoTracks[0];
-                if (!videoTrack) throw new Error("找不到影像軌");
-
                 muxer = new Mp4Muxer.Muxer({
                     target: target,
                     video: {
@@ -87,8 +84,7 @@
                     },
                     fastStart: 'in-memory'
                 });
-
-                // 正確的 MP4Box 提取設定
+                // 修正 API 呼叫
                 mp4boxfile.setExtractionConfig(videoTrack.id, null, { nb_samples: 100 });
                 mp4boxfile.start();
             };
@@ -107,7 +103,6 @@
                 }
             };
 
-            // 使用 ReadableStream 處理 200MB 限制
             const reader = file.stream().getReader();
             let offset = 0;
             while (true) {
@@ -117,24 +112,21 @@
                 buffer.fileStart = offset;
                 mp4boxfile.appendBuffer(buffer);
                 offset += buffer.byteLength;
-                statusEl.innerText = `讀取進度: ${Math.round((offset / file.size) * 100)}%`;
+                statusEl.innerText = `處理進度: ${Math.round((offset / file.size) * 100)}%`;
             }
 
             mp4boxfile.flush();
             if (muxer) muxer.finalize();
 
-            statusEl.innerText = "完成！正在下載...";
             const blob = new Blob([target.buffer], { type: 'video/mp4' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             a.download = `cut_${Date.now()}.mp4`;
             a.click();
-            statusEl.innerHTML = '<span class="success">✅ 剪輯成功，請查看下載項目！</span>';
-
+            statusEl.innerHTML = '<span class="success">✅ 剪輯完成！</span>';
         } catch (err) {
-            statusEl.innerHTML = `<span style="color:red">錯誤: ${err.message}</span>`;
-            console.error(err);
+            statusEl.innerHTML = `<span class="error">錯誤: ${err.message}</span>`;
         } finally {
             btn.disabled = false;
         }
