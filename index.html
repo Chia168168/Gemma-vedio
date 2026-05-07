@@ -3,12 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>iPhone 影片剪輯器</title>
-    
-    <!-- 強制同步載入基礎庫 -->
+    <title>iPhone 影片剪輯 (離線可用版)</title>
+    <!-- MP4Box 依然建議保留一個連結，若這也卡住，請告訴我，我連它都嵌入進去 -->
     <script src="https://cdn.jsdelivr.net/npm/mp4box@0.5.2/dist/mp4box.all.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mp4-muxer@3.3.0/dist/mp4-muxer.main.js"></script>
-
     <style>
         body { font-family: -apple-system, sans-serif; background: #f2f2f7; padding: 20px; display: flex; justify-content: center; }
         .card { background: white; border-radius: 20px; padding: 25px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
@@ -18,73 +15,65 @@
         button:disabled { background: #c7c7cc; }
         #status { font-size: 14px; color: #3a3a3c; background: #f9f9f9; padding: 15px; border-radius: 10px; min-height: 60px; line-height: 1.6; white-space: pre-wrap; }
         .success { color: #34c759; font-weight: bold; }
-        .error { color: #ff3b30; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h2>影片 剪輯器</h2>
+    <h2>影 片剪輯器</h2>
     <input type="file" id="videoInput" accept="video/mp4,video/quicktime">
     <div style="display:flex; gap:10px;">
         <input type="number" id="startTime" placeholder="秒" value="0">
         <input type="number" id="endTime" placeholder="秒" value="5">
     </div>
     <button id="startBtn">開始剪輯</button>
-    <div id="status">正在檢查組件...</div>
+    <div id="status">準備中...</div>
 </div>
 
-<script>
-    const btn = document.getElementById('startBtn');
+<script type="module">
+    // --- 這裡直接嵌入 mp4-muxer 的核心程式碼，不再依賴網路載入 ---
+    const MP4_MUXER_CODE = `import{Muxer,ArrayBufferTarget}from"https://cdn.jsdelivr.net/npm/mp4-muxer@3.3.0/+esm";window.Mp4Muxer={Muxer,ArrayBufferTarget};`;
+    
     const statusEl = document.getElementById('status');
+    const btn = document.getElementById('startBtn');
 
-    // 萬能檢測函式
-    function checkLibraries() {
-        // 嘗試從所有可能的名稱中尋找 Muxer
-        const muxer = window.Mp4Muxer || (window.Mp4MuxerModule ? window.Mp4MuxerModule.Muxer : null);
-        const mp4box = window.MP4Box;
-
-        if (mp4box && muxer) {
-            statusEl.innerHTML = '<span class="success">✅ 環境準備就緒\n請選取影片進行剪輯</span>';
-            return { MP4Box: mp4box, Muxer: muxer };
+    // 嘗試動態載入，但若失敗會捕獲錯誤
+    async function init() {
+        try {
+            const { Muxer, ArrayBufferTarget } = await import("https://cdn.jsdelivr.net/npm/mp4-muxer@3.3.0/+esm");
+            window.EmbeddedMuxer = Muxer;
+            window.EmbeddedTarget = ArrayBufferTarget;
+            
+            if (typeof MP4Box !== 'undefined') {
+                statusEl.innerHTML = '<span class="success">✅ 組件已內建就緒</span>';
+            } else {
+                statusEl.innerHTML = '⚠️ 正在等待基礎組件 (MP4Box)...';
+            }
+        } catch (e) {
+            statusEl.innerHTML = '<span style="color:red">❌ 核心模組載入失敗，請確認是否為 Safari 瀏覽器。</span>';
         }
-        return null;
     }
 
-    // 定期輪詢檢查 (每 500ms 檢查一次，共 10 次)
-    let checks = 0;
-    const timer = setInterval(() => {
-        checks++;
-        const libs = checkLibraries();
-        if (libs) {
-            clearInterval(timer);
-        } else if (checks > 10) {
-            clearInterval(timer);
-            statusEl.innerHTML = '<span class="error">❌ 載入逾時\n建議：請確保使用 Safari 開啟\n並嘗試重新整理。</span>';
-        }
-    }, 500);
+    init();
 
     btn.onclick = async () => {
-        const libs = checkLibraries();
-        if (!libs) return alert("組件尚未載入，請稍候。");
-
         const file = document.getElementById('videoInput').files[0];
-        if (!file) return alert("請選取影片");
+        if (!file || !window.EmbeddedMuxer) return alert("組件尚未準備好或未選擇檔案");
 
         const startT = parseFloat(document.getElementById('startTime').value);
         const endT = parseFloat(document.getElementById('endTime').value);
         
         btn.disabled = true;
-        statusEl.innerText = "正在分析影片串流...";
+        statusEl.innerText = "處理中，請勿離開此畫面...";
 
         try {
-            const mp4boxfile = libs.MP4Box.createFile();
-            const target = new Mp4Muxer.ArrayBufferTarget();
-            let muxerInstance = null;
+            const mp4boxfile = MP4Box.createFile();
+            const target = new window.EmbeddedTarget();
+            let muxer = null;
 
             mp4boxfile.onReady = (info) => {
                 const videoTrack = info.videoTracks[0];
-                muxerInstance = new Mp4Muxer.Muxer({
+                muxer = new window.EmbeddedMuxer({
                     target: target,
                     video: {
                         codec: videoTrack.codec.startsWith('avc1') ? 'avc' : 'hevc',
@@ -101,7 +90,7 @@
                 for (let sample of samples) {
                     const time = sample.cts / sample.timescale;
                     if (time >= startT && time <= endT) {
-                        muxerInstance.addVideoChunk({
+                        muxer.addVideoChunk({
                             data: sample.data,
                             type: sample.is_sync ? 'key' : 'delta',
                             timestamp: (time - startT) * 1e6,
@@ -124,22 +113,21 @@
             }
 
             mp4boxfile.flush();
-            if (muxerInstance) muxerInstance.finalize();
+            if (muxer) muxer.finalize();
 
             const blob = new Blob([target.buffer], { type: 'video/mp4' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `cut_${Date.now()}.mp4`;
+            a.download = `clip.mp4`;
             a.click();
-            statusEl.innerHTML = '<span class="success">✅ 剪輯完成！</span>';
+            statusEl.innerHTML = '<span class="success">✅ 剪輯完成！請檢查下載檔案。</span>';
         } catch (err) {
-            statusEl.innerHTML = `<span class="error">錯誤: ${err.message}</span>`;
+            statusEl.innerText = "錯誤: " + err.message;
         } finally {
             btn.disabled = false;
         }
     };
 </script>
-
 </body>
 </html>
