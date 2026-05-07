@@ -1431,48 +1431,37 @@ async function remuxClip(file, clipIn, clipOut) {
   const lastByte  = sorted[sorted.length-1].byteOff + sorted[sorted.length-1].sz;
   const rawBuf = new Uint8Array(await readFileSlice(file, firstByte, Math.min(lastByte, file.size)));
 
-  // 5. Extract avcC (SPS/PPS) from moov for codec description
-  function findAvcC(b, s, e) {
-    let off = s;
-    while (off + 8 <= e) {
-      const sz = u32(b, off);
-      const nm = String.fromCharCode(b[off+4], b[off+5], b[off+6], b[off+7]);
-      if (sz < 8) break;
-      const ce = Math.min(off + sz, e);
-      if (['trak','mdia','minf','stbl','stsd','avc1','avc2','hvc1','hev1'].includes(nm)) {
-        const found = findAvcC(b, off + 8, ce);
-        if (found) return found;
+  // 5. Extract avcC by direct byte scan
+  let avcCBytes = null;
+  for (let i = 4; i + 8 <= moovBytes.length; i++) {
+    if (moovBytes[i]===0x61 && moovBytes[i+1]===0x76 &&
+        moovBytes[i+2]===0x63 && moovBytes[i+3]===0x43) { // 'avcC'
+      const sz = u32(moovBytes, i - 4);
+      if (sz >= 8 && i - 4 + sz <= moovBytes.length) {
+        avcCBytes = moovBytes.slice(i + 4, i - 4 + sz); // content after size+name
+        break;
       }
-      if (nm === 'avcC') return b.slice(off + 8, ce); // return avcC content (after size+name)
-      off += sz;
     }
-    return null;
   }
-  const avcCBytes = findAvcC(moovBytes, 8, moovBytes.length);
+
+  // Build codec string from avcC: avc1.PPCCLL
+  let codecStr = 'avc1.640028';
+  if (avcCBytes && avcCBytes.length >= 4) {
+    // avcC: configVersion(1) + profile(1) + compat(1) + level(1) + ...
+    const p = avcCBytes[1].toString(16).padStart(2,'0');
+    const c = avcCBytes[2].toString(16).padStart(2,'0');
+    const l = avcCBytes[3].toString(16).padStart(2,'0');
+    codecStr = `avc1.${p}${c}${l}`;
+  }
 
   // 5. Mux with mp4-muxer
   const { Muxer, ArrayBufferTarget } = Mp4Muxer;
   const target = new ArrayBufferTarget();
-
-  const muxerConfig = {
+  const muxer = new Muxer({
     target,
-    video: {
-      codec: 'avc',
-      width: video.videoWidth,
-      height: video.videoHeight,
-    },
+    video: { codec: 'avc', width: video.videoWidth, height: video.videoHeight },
     fastStart: 'in-memory',
-  };
-
-  const muxer = new Muxer(muxerConfig);
-
-  // Build VideoDecoderConfig-style description from avcC
-  const videoMeta = avcCBytes ? {
-    decoderConfig: {
-      codec: 'avc1.640028',
-      description: avcCBytes,
-    }
-  } : undefined;
+  });
 
   const ticksPerUs = 1e6 / timescale;
   const frameDurUs = Math.round((1 / fps) * 1e6);
@@ -1486,8 +1475,20 @@ async function remuxClip(file, clipIn, clipOut) {
       duration:  frameDurUs,
       data,
     });
-    const meta = firstChunk && videoMeta ? videoMeta
-               : (s.pts !== s.dts ? { compositionTimeOffset: Math.round((s.pts - s.dts) * ticksPerUs) } : undefined);
+    let meta;
+    if (firstChunk && avcCBytes) {
+      firstChunk = false;
+      meta = {
+        decoderConfig: {
+          codec: codecStr,
+          description: avcCBytes.buffer.slice(avcCBytes.byteOffset, avcCBytes.byteOffset + avcCBytes.byteLength),
+          codedWidth: video.videoWidth,
+          codedHeight: video.videoHeight,
+        }
+      };
+    } else if (s.pts !== s.dts) {
+      meta = { compositionTimeOffset: Math.round((s.pts - s.dts) * ticksPerUs) };
+    }
     firstChunk = false;
     muxer.addVideoChunk(chunk, meta);
     exportProgressF.style.width = Math.min(95, 10 + Math.round((s.dts / (sampleDTS[Math.min(s1-1, sampleDTS.length-1)] - startDTS || 1)) * 85)) + '%';
