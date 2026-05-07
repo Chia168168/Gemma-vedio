@@ -1440,20 +1440,21 @@ async function remuxClip(file, clipIn, clipOut) {
     fastStart: 'in-memory',
   });
 
-  const ticksPerUs = timescale / 1e6;
+  const ticksPerUs = 1e6 / timescale;
+  const frameDurUs = Math.round((1 / fps) * 1e6);
 
-  // Get codec config from original video element (VideoDecoder.isConfigSupported is optional)
-  // Feed raw chunks as EncodedVideoChunk
   for (const s of samples) {
     const data = rawBuf.slice(s.byteOff - firstByte, s.byteOff - firstByte + s.sz);
     const chunk = new EncodedVideoChunk({
       type: s.isKey ? 'key' : 'delta',
-      timestamp: Math.round(s.pts / ticksPerUs),   // microseconds
-      duration:  Math.round(1 / fps / ticksPerUs),
+      timestamp: Math.round(s.dts * ticksPerUs),
+      duration:  frameDurUs,
       data,
     });
-    muxer.addVideoChunk(chunk);
-    exportProgressF.style.width = Math.min(95, 10 + Math.round((s.dts / (sampleDTS[s1-1] - startDTS || 1)) * 85)) + '%';
+    // Pass compositionTimeOffset so PTS is correct (needed for B-frames)
+    const meta = s.pts !== s.dts ? { compositionTimeOffset: Math.round((s.pts - s.dts) * ticksPerUs) } : undefined;
+    muxer.addVideoChunk(chunk, meta);
+    exportProgressF.style.width = Math.min(95, 10 + Math.round((s.dts / (sampleDTS[Math.min(s1-1, sampleDTS.length-1)] - startDTS || 1)) * 85)) + '%';
   }
 
   muxer.finalize();
