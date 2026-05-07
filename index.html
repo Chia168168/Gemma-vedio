@@ -3,82 +3,61 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>iPhone 大檔案影片剪輯器</title>
-    <!-- 引入處理 MP4 結構的必要函式庫 -->
+    <title>iPhone 剪輯修正版</title>
     <script src="https://cdn.jsdelivr.net/npm/mp4box@0.5.2/dist/mp4box.all.min.js"></script>
     <style>
-        body { font-family: -apple-system, system-ui, sans-serif; background: #f2f2f7; padding: 20px; display: flex; justify-content: center; }
-        .card { background: white; border-radius: 20px; padding: 25px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
-        h2 { margin: 0 0 10px; font-size: 20px; color: #007aff; }
-        .info { font-size: 13px; color: #666; margin-bottom: 20px; }
-        input[type="file"] { width: 100%; margin-bottom: 20px; }
-        .input-group { display: flex; gap: 10px; margin-bottom: 20px; }
-        .input-group div { flex: 1; }
-        label { font-size: 12px; font-weight: 600; color: #8e8e93; display: block; margin-bottom: 4px; }
-        input[type="number"] { width: 100%; border: 1px solid #d1d1d6; border-radius: 8px; padding: 10px; box-sizing: border-box; -webkit-appearance: none; }
-        button { background: #007aff; color: white; border: none; width: 100%; padding: 15px; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; }
-        button:disabled { background: #c7c7cc; }
-        #status { margin-top: 15px; font-size: 14px; text-align: center; color: #3a3a3c; }
-        progress { width: 100%; height: 6px; margin-top: 12px; display: none; }
+        body { font-family: -apple-system, sans-serif; background: #f2f2f7; padding: 20px; text-align: center; }
+        .card { background: white; border-radius: 15px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 400px; margin: auto; }
+        input, button { width: 100%; margin-top: 15px; padding: 12px; box-sizing: border-box; border-radius: 8px; border: 1px solid #ddd; }
+        button { background: #007aff; color: white; font-weight: bold; border: none; }
+        #status { margin-top: 15px; font-size: 14px; color: #666; white-space: pre-wrap; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h2>影片快速剪輯</h2>
-    <p class="info">採用串流技術，支援 200MB+ 檔案且不損畫質。</p>
-    
-    <label>選擇影片 (MP4)</label>
-    <input type="file" id="videoInput" accept="video/mp4">
-
-    <div class="input-group">
-        <div>
-            <label>開始 (秒)</label>
-            <input type="number" id="startTime" value="0" min="0">
-        </div>
-        <div>
-            <label>結束 (秒)</label>
-            <input type="number" id="endTime" value="10" min="1">
-        </div>
-    </div>
-
-    <button id="startBtn">開始剪輯</button>
-    
-    <progress id="progressBar" value="0" max="100"></progress>
-    <div id="status">準備就緒</div>
+    <h3>影片快速剪輯 (修正版)</h3>
+    <input type="file" id="videoInput" accept="video/mp4,video/quicktime">
+    <input type="number" id="startTime" placeholder="開始秒數" value="0">
+    <input type="number" id="endTime" placeholder="結束秒數" value="5">
+    <button id="startBtn">確認剪輯</button>
+    <div id="status">狀態：等待操作</div>
 </div>
 
 <script type="module">
-    // 使用 ES Module 引入，解決 Mp4Muxer 找不到的問題
-    import * as Mp4Muxer from 'https://cdn.jsdelivr.net/npm/mp4-muxer@3.3.0/+esm';
+    // 直接從更穩定的來源引入
+    import { Muxer, ArrayBufferTarget } from 'https://cdn.jsdelivr.net/npm/mp4-muxer@3.3.0/+esm';
 
     const btn = document.getElementById('startBtn');
     const status = document.getElementById('status');
-    const progress = document.getElementById('progressBar');
 
     btn.onclick = async () => {
         const file = document.getElementById('videoInput').files[0];
-        const startT = parseFloat(document.getElementById('startTime').value);
-        const endT = parseFloat(document.getElementById('endTime').value);
+        if (!file) {
+            alert("錯誤：請先選取檔案！");
+            return;
+        }
 
-        if (!file) return alert("請選擇檔案");
-
+        status.innerText = "初始化中...";
         btn.disabled = true;
-        progress.style.display = 'block';
-        status.innerText = "正在讀取影片頭資訊...";
 
         try {
+            const startT = parseFloat(document.getElementById('startTime').value);
+            const endT = parseFloat(document.getElementById('endTime').value);
+
+            // 檢查檔案流是否可用
+            if (!file.stream) throw new Error("您的瀏覽器不支援 stream API");
+
             const mp4boxfile = MP4Box.createFile();
-            let videoTrack = null;
             let muxer = null;
+            let target = new ArrayBufferTarget();
 
-            // 1. 初始化 Muxer
-            // 這裡使用 ArrayBufferTarget 處理結果
-            const target = new Mp4Muxer.ArrayBufferTarget();
-
+            // 監聽解析完成
             mp4boxfile.onReady = (info) => {
-                videoTrack = info.videoTracks[0];
-                muxer = new Mp4Muxer.Muxer({
+                status.innerText = "分析影片資訊成功...";
+                const videoTrack = info.videoTracks[0];
+                
+                muxer = new Muxer({
                     target: target,
                     video: {
                         codec: videoTrack.codec.startsWith('avc1') ? 'avc' : 'hevc',
@@ -88,27 +67,25 @@
                     fastStart: 'in-memory'
                 });
 
-                // 設定提取範圍
-                mp4boxfile.setExtractionConfig(videoTrack.id, null, { nb_samples: 1000 });
+                mp4boxfile.setExtractionConfig(videoTrack.id, null, { nb_samples: 100 });
                 mp4boxfile.start();
             };
 
             mp4boxfile.onSamples = (id, user, samples) => {
                 for (let sample of samples) {
-                    const sampleTime = sample.cts / sample.timescale;
-                    if (sampleTime >= startT && sampleTime <= endT) {
+                    const time = sample.cts / sample.timescale;
+                    if (time >= startT && time <= endT) {
                         muxer.addVideoChunk({
                             data: sample.data,
                             type: sample.is_sync ? 'key' : 'delta',
-                            timestamp: (sampleTime - startT) * 1e6, // 微秒
+                            timestamp: (time - startT) * 1e6,
                             duration: (sample.duration / sample.timescale) * 1e6
                         });
                     }
                 }
-                status.innerText = `正在處理中...`;
             };
 
-            // 2. 使用串流讀取檔案 (這是處理 200MB 的關鍵)
+            // 讀取檔案流
             const reader = file.stream().getReader();
             let offset = 0;
             while (true) {
@@ -118,24 +95,26 @@
                 buffer.fileStart = offset;
                 mp4boxfile.appendBuffer(buffer);
                 offset += buffer.byteLength;
-                progress.value = (offset / file.size) * 100;
+                status.innerText = `讀取中: ${Math.round((offset/file.size)*100)}%`;
             }
 
             mp4boxfile.flush();
-            muxer.finalize();
+            if (muxer) muxer.finalize();
 
-            // 3. 輸出檔案
+            // 下載
+            status.innerText = "剪輯完成，準備下載...";
             const blob = new Blob([target.buffer], { type: 'video/mp4' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `cut_${file.name}`;
+            a.download = `cut_${Date.now()}.mp4`;
             a.click();
-
-            status.innerText = "剪輯完成！檔案已下載。";
-        } catch (e) {
-            console.error(e);
-            status.innerText = "發生錯誤: " + e.message;
+            
+            status.innerText = "完成！";
+        } catch (err) {
+            console.error(err);
+            alert("執行失敗：" + err.message);
+            status.innerText = "錯誤：" + err.message;
         } finally {
             btn.disabled = false;
         }
