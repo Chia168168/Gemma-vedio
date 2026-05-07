@@ -1431,17 +1431,52 @@ async function remuxClip(file, clipIn, clipOut) {
   const lastByte  = sorted[sorted.length-1].byteOff + sorted[sorted.length-1].sz;
   const rawBuf = new Uint8Array(await readFileSlice(file, firstByte, Math.min(lastByte, file.size)));
 
+  // 5. Extract avcC (SPS/PPS) from moov for codec description
+  function findAvcC(b, s, e) {
+    let off = s;
+    while (off + 8 <= e) {
+      const sz = u32(b, off);
+      const nm = String.fromCharCode(b[off+4], b[off+5], b[off+6], b[off+7]);
+      if (sz < 8) break;
+      const ce = Math.min(off + sz, e);
+      if (['trak','mdia','minf','stbl','stsd','avc1','avc2','hvc1','hev1'].includes(nm)) {
+        const found = findAvcC(b, off + 8, ce);
+        if (found) return found;
+      }
+      if (nm === 'avcC') return b.slice(off + 8, ce); // return avcC content (after size+name)
+      off += sz;
+    }
+    return null;
+  }
+  const avcCBytes = findAvcC(moovBytes, 8, moovBytes.length);
+
   // 5. Mux with mp4-muxer
   const { Muxer, ArrayBufferTarget } = Mp4Muxer;
   const target = new ArrayBufferTarget();
-  const muxer = new Muxer({
+
+  const muxerConfig = {
     target,
-    video: { codec: 'avc', width: video.videoWidth, height: video.videoHeight },
+    video: {
+      codec: 'avc',
+      width: video.videoWidth,
+      height: video.videoHeight,
+    },
     fastStart: 'in-memory',
-  });
+  };
+
+  const muxer = new Muxer(muxerConfig);
+
+  // Build VideoDecoderConfig-style description from avcC
+  const videoMeta = avcCBytes ? {
+    decoderConfig: {
+      codec: 'avc1.640028',
+      description: avcCBytes,
+    }
+  } : undefined;
 
   const ticksPerUs = 1e6 / timescale;
   const frameDurUs = Math.round((1 / fps) * 1e6);
+  let firstChunk = true;
 
   for (const s of samples) {
     const data = rawBuf.slice(s.byteOff - firstByte, s.byteOff - firstByte + s.sz);
@@ -1451,8 +1486,9 @@ async function remuxClip(file, clipIn, clipOut) {
       duration:  frameDurUs,
       data,
     });
-    // Pass compositionTimeOffset so PTS is correct (needed for B-frames)
-    const meta = s.pts !== s.dts ? { compositionTimeOffset: Math.round((s.pts - s.dts) * ticksPerUs) } : undefined;
+    const meta = firstChunk && videoMeta ? videoMeta
+               : (s.pts !== s.dts ? { compositionTimeOffset: Math.round((s.pts - s.dts) * ticksPerUs) } : undefined);
+    firstChunk = false;
     muxer.addVideoChunk(chunk, meta);
     exportProgressF.style.width = Math.min(95, 10 + Math.round((s.dts / (sampleDTS[Math.min(s1-1, sampleDTS.length-1)] - startDTS || 1)) * 85)) + '%';
   }
