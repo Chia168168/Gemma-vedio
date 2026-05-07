@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>iPhone 影片剪輯 (物理內嵌版)</title>
+    <title>iPhone 影片剪輯 (正式版)</title>
     <style>
         body { font-family: -apple-system, sans-serif; background: #f2f2f7; padding: 20px; display: flex; justify-content: center; }
         .card { background: white; border-radius: 20px; padding: 25px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
@@ -14,14 +14,13 @@
         button:disabled { background: #c7c7cc; }
         #status { font-size: 14px; color: #3a3a3c; background: #f9f9f9; padding: 15px; border-radius: 10px; margin-top: 15px; line-height: 1.5; white-space: pre-wrap; }
         .success { color: #34c759; font-weight: bold; }
-        .error { color: #ff3b30; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h2>影片 剪輯器</h2>
-    <div id="status">🧬 正在解構內置基因...</div>
+    <h2>影片剪輯器</h2>
+    <div id="status">🧬 正在初始化核心...</div>
     
     <label>1. 選取影片</label>
     <input type="file" id="videoInput" accept="video/mp4,video/quicktime">
@@ -37,62 +36,105 @@
         </div>
     </div>
 
-    <button id="startBtn" disabled>正在初始化</button>
+    <button id="startBtn" disabled>請稍候</button>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mp4box/0.5.2/mp4box.all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mp4-muxer@3.3.0/dist/mp4-muxer.main.js"></script>
+
 <script>
-    (function() {
-        const statusEl = document.getElementById('status');
-        const btn = document.getElementById('startBtn');
-        
-        async function wakeUp() {
-            statusEl.innerText = "正在檢查系統相容性...";
-            const script = document.createElement('script');
-            script.src = "https://cdn.jsdelivr.net/npm/mp4box@0.5.2/dist/mp4box.all.min.js"; 
-            document.head.appendChild(script);
+    const statusEl = document.getElementById('status');
+    const btn = document.getElementById('startBtn');
 
-            script.onload = () => {
-                statusEl.innerHTML = '<span class="success">✅ 物理引擎已載入！</span>\n現在選影片不會斷線了。';
-                btn.disabled = false;
-                btn.innerText = "開始剪輯";
-            };
+    // 檢查組件載入狀態
+    function checkLibs() {
+        if (typeof MP4Box !== 'undefined' && typeof Mp4Muxer !== 'undefined') {
+            statusEl.innerHTML = '<span class="success">✅ 引擎就緒</span>\n可以開始剪輯。';
+            btn.disabled = false;
+            btn.innerText = "開始剪輯";
+        } else {
+            setTimeout(checkLibs, 500);
         }
-        wakeUp();
-    })();
+    }
+    checkLibs();
 
-    document.getElementById('startBtn').onclick = async () => {
+    btn.onclick = async () => {
         const file = document.getElementById('videoInput').files[0];
-        const status = document.getElementById('status');
         if (!file) return;
 
-        status.innerText = "分析中...";
+        const startT = parseFloat(document.getElementById('startTime').value);
+        const endT = parseFloat(document.getElementById('endTime').value);
+
+        btn.disabled = true;
+        statusEl.innerText = "🎬 正在精準剪切中...";
+
         try {
             const mp4boxfile = MP4Box.createFile();
-            
-            // --- 核心剪輯邏輯（保持不變，補足存檔功能） ---
-            // 這裡模擬處理完成後的數據封裝
-            status.innerText = "正在提取影格...";
-            
-            // 假設處理完成後我們拿到一個 Blob
-            // 在實際環境中，這段會接在你原本處理完數據的 callback 之後
-            const buffer = await file.arrayBuffer(); // 此為示意，確保代碼能跑
-            const blob = new Blob([buffer], { type: 'video/mp4' });
-            const url = URL.createObjectURL(blob);
+            const target = new Mp4Muxer.ArrayBufferTarget();
+            let muxer = null;
 
-            // 觸發自動下載
+            mp4boxfile.onReady = (info) => {
+                const videoTrack = info.videoTracks[0];
+                muxer = new Mp4Muxer.Muxer({
+                    target: target,
+                    video: {
+                        codec: videoTrack.codec.startsWith('avc1') ? 'avc' : 'hevc',
+                        width: videoTrack.video.width,
+                        height: videoTrack.video.height
+                    },
+                    fastStart: 'in-memory'
+                });
+                // 設定提取範圍
+                mp4boxfile.setExtractionConfig(videoTrack.id, null, { nb_samples: 100 });
+                mp4boxfile.start();
+            };
+
+            mp4boxfile.onSamples = (id, user, samples) => {
+                for (let sample of samples) {
+                    const time = sample.cts / sample.timescale;
+                    // 只把範圍內的影格餵給 muxer
+                    if (time >= startT && time <= endT) {
+                        muxer.addVideoChunk({
+                            data: sample.data,
+                            type: sample.is_sync ? 'key' : 'delta',
+                            timestamp: (time - startT) * 1e6, // 重新計算時間戳
+                            duration: (sample.duration / sample.timescale) * 1e6
+                        });
+                    }
+                }
+            };
+
+            // 讀取並處理檔案
+            const reader = file.stream().getReader();
+            let offset = 0;
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const buffer = value.buffer;
+                buffer.fileStart = offset;
+                mp4boxfile.appendBuffer(buffer);
+                offset += buffer.byteLength;
+            }
+
+            mp4boxfile.flush();
+            if (muxer) muxer.finalize();
+
+            // 生成剪輯後的檔案
+            const blob = new Blob([target.buffer], { type: 'video/mp4' });
+            const url = URL.createObjectURL(blob);
+            
             const a = document.createElement('a');
             a.href = url;
             a.download = `cut_${Date.now()}.mp4`;
-            document.body.appendChild(a);
             a.click();
-            document.body.removeChild(a);
 
-            // 顯示成功狀態與手動連結（防止自動下載失敗）
-            status.innerHTML = `<span class="success">✅ 完成！請查看下載項目。</span><br><br>` + 
-                               `<a href="${url}" download="video.mp4" style="color:#007aff;text-decoration:none;font-weight:bold;">點擊這裡手動存檔</a>`;
+            statusEl.innerHTML = `<span class="success">✅ 剪輯完成！</span><br><br>` + 
+                               `<a href="${url}" download="cut.mp4" style="color:#007aff;font-weight:bold;">點此再次手動儲存</a>`;
             
-        } catch(e) {
-            status.innerText = "致命錯誤: " + e.message;
+        } catch (e) {
+            statusEl.innerText = "失敗: " + e.message;
+        } finally {
+            btn.disabled = false;
         }
     };
 </script>
