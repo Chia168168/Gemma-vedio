@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>iPhone 影片剪輯 (正式版)</title>
+    <title>iPhone 影片剪輯器</title>
     <style>
         body { font-family: -apple-system, sans-serif; background: #f2f2f7; padding: 20px; display: flex; justify-content: center; }
         .card { background: white; border-radius: 20px; padding: 25px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
@@ -36,31 +36,58 @@
         </div>
     </div>
 
-    <button id="startBtn" disabled>請稍候</button>
+    <button id="startBtn" disabled>等待組件載入...</button>
 </div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mp4box/0.5.2/mp4box.all.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/mp4-muxer@3.3.0/dist/mp4-muxer.main.js"></script>
 
 <script>
     const statusEl = document.getElementById('status');
     const btn = document.getElementById('startBtn');
 
-    // 檢查組件載入狀態
-    function checkLibs() {
-        if (typeof MP4Box !== 'undefined' && typeof Mp4Muxer !== 'undefined') {
-            statusEl.innerHTML = '<span class="success">✅ 引擎就緒</span>\n可以開始剪輯。';
+    // 多重備援載入機制
+    async function loadScript(urls) {
+        for (let url of urls) {
+            try {
+                await new Promise((resolve, reject) => {
+                    const s = document.createElement('script');
+                    s.src = url;
+                    s.onload = resolve;
+                    s.onerror = reject;
+                    document.head.appendChild(s);
+                });
+                return true; // 只要有一個載入成功就回傳
+            } catch (e) {
+                console.warn(`載入失敗: ${url}`);
+            }
+        }
+        return false;
+    }
+
+    async function init() {
+        const mp4boxOk = await loadScript([
+            'https://cdn.jsdelivr.net/npm/mp4box@0.5.2/dist/mp4box.all.min.js',
+            'https://cdnjs.cloudflare.com/ajax/libs/mp4box/0.5.2/mp4box.all.min.js',
+            'https://unpkg.com/mp4box@0.5.2/dist/mp4box.all.min.js'
+        ]);
+
+        const muxerOk = await loadScript([
+            'https://cdn.jsdelivr.net/npm/mp4-muxer@3.3.0/dist/mp4-muxer.main.js',
+            'https://unpkg.com/mp4-muxer@3.3.0/dist/mp4-muxer.main.js'
+        ]);
+
+        if (mp4boxOk && muxerOk) {
+            statusEl.innerHTML = '<span class="success">✅ 引擎就緒</span>\n現在可以開始剪輯了。';
             btn.disabled = false;
             btn.innerText = "開始剪輯";
         } else {
-            setTimeout(checkLibs, 500);
+            statusEl.innerHTML = '<span style="color:red">❌ 組件連線失敗</span>\n請嘗試：\n1. 關閉 VPN\n2. 更換網路 (WiFi/4G)\n3. 使用 Safari 開啟';
         }
     }
-    checkLibs();
+
+    init();
 
     btn.onclick = async () => {
         const file = document.getElementById('videoInput').files[0];
-        if (!file) return;
+        if (!file) return alert("請選取影片");
 
         const startT = parseFloat(document.getElementById('startTime').value);
         const endT = parseFloat(document.getElementById('endTime').value);
@@ -84,7 +111,6 @@
                     },
                     fastStart: 'in-memory'
                 });
-                // 設定提取範圍
                 mp4boxfile.setExtractionConfig(videoTrack.id, null, { nb_samples: 100 });
                 mp4boxfile.start();
             };
@@ -92,19 +118,17 @@
             mp4boxfile.onSamples = (id, user, samples) => {
                 for (let sample of samples) {
                     const time = sample.cts / sample.timescale;
-                    // 只把範圍內的影格餵給 muxer
                     if (time >= startT && time <= endT) {
                         muxer.addVideoChunk({
                             data: sample.data,
                             type: sample.is_sync ? 'key' : 'delta',
-                            timestamp: (time - startT) * 1e6, // 重新計算時間戳
+                            timestamp: (time - startT) * 1e6,
                             duration: (sample.duration / sample.timescale) * 1e6
                         });
                     }
                 }
             };
 
-            // 讀取並處理檔案
             const reader = file.stream().getReader();
             let offset = 0;
             while (true) {
@@ -114,22 +138,23 @@
                 buffer.fileStart = offset;
                 mp4boxfile.appendBuffer(buffer);
                 offset += buffer.byteLength;
+                statusEl.innerText = `處理進度: ${Math.round((offset/file.size)*100)}%`;
             }
 
             mp4boxfile.flush();
             if (muxer) muxer.finalize();
 
-            // 生成剪輯後的檔案
             const blob = new Blob([target.buffer], { type: 'video/mp4' });
             const url = URL.createObjectURL(blob);
             
             const a = document.createElement('a');
             a.href = url;
             a.download = `cut_${Date.now()}.mp4`;
+            document.body.appendChild(a);
             a.click();
+            document.body.removeChild(a);
 
-            statusEl.innerHTML = `<span class="success">✅ 剪輯完成！</span><br><br>` + 
-                               `<a href="${url}" download="cut.mp4" style="color:#007aff;font-weight:bold;">點此再次手動儲存</a>`;
+            statusEl.innerHTML = `<span class="success">✅ 剪輯完成！</span>\n影片應已儲存至「檔案」或「下載」中。\n\n<a href="${url}" download="cut.mp4" style="color:#007aff;font-weight:bold;">點此再次手動儲存</a>`;
             
         } catch (e) {
             statusEl.innerText = "失敗: " + e.message;
