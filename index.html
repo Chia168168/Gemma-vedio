@@ -1927,37 +1927,70 @@ document.getElementById('loop-export').addEventListener('click', async e => {
 
 // ── mp4box.js clip extraction ──
 async function mp4boxClip(file, clipIn, clipOut, onProgress) {
-  // Step 1: Parse moov with our own parser (fast, no blocking)
   const SCAN = Math.min(10 * 1024 * 1024, file.size);
-  let moovBytes = null, ftypBytes = null;
 
-  async function scanBuf(ab) {
-    const b = new Uint8Array(ab); let off = 0;
-    while (off + 8 <= b.length) {
-      const sz = (b[off]<<24|b[off+1]<<16|b[off+2]<<8|b[off+3])>>>0;
-      const nm = String.fromCharCode(b[off+4],b[off+5],b[off+6],b[off+7]);
-      if (sz < 8) break;
-      if (nm === 'ftyp') ftypBytes = b.slice(off, off + sz);
-      if (nm === 'moov') { moovBytes = b.slice(off, Math.min(off + sz, b.length)); return; }
-      off += sz;
-    }
-  }
-  await scanBuf(await readFileSlice(file, 0, SCAN));
-  if (!moovBytes && file.size > SCAN) {
-    const tail = new Uint8Array(await readFileSlice(file, file.size - SCAN, file.size));
-    for (let i = 4; i + 8 <= tail.length; i++) {
-      if (String.fromCharCode(tail[i],tail[i+1],tail[i+2],tail[i+3]) === 'moov') {
-        moovBytes = tail.slice(i - 4, Math.min(i - 4 + (tail[i-4]<<24|tail[i-3]<<16|tail[i-2]<<8|tail[i-1])>>>0, tail.length));
-        break;
+  // 1. Feed head (and tail if needed) to mp4box just to get moov info + avcC
+  const mp4info = await new Promise(async (resolve, reject) => {
+    const mp4 = MP4Box.createFile();
+    mp4.onError = e => reject(new Error('解析失敗: ' + e));
+    mp4.onReady = info => resolve({ info, file: mp4 });
+
+    const headBuf = await readFileSlice(file, 0, SCAN);
+    headBuf.fileStart = 0;
+    mp4.appendBuffer(headBuf);
+    mp4.flush();
+
+    // If onReady didn't fire, try tail
+    setTimeout(async () => {
+      if (file.size > SCAN) {
+        const tailBuf = await readFileSlice(file, file.size - SCAN, file.size);
+        tailBuf.fileStart = file.size - SCAN;
+        mp4.appendBuffer(tailBuf);
+        mp4.flush();
       }
-    }
-  }
-  if (!moovBytes) throw new Error('找不到 moov');
+    }, 200);
 
-  // Step 2: Parse video track tables
-  const vt = parseVideoTrackFull(moovBytes.buffer);
-  if (!vt || !vt.stco.length) throw new Error('找不到視訊軌');
-  const { timescale, stts, stsc, stco, stsz, stss, fixedSampleSize } = vt;
+    setTimeout(() => reject(new Error('解析超時')), 8000);
+  });
+
+  const { info, file: mp4file } = mp4info;
+  const vt = info.tracks.find(t => t.type === 'video');
+  if (!vt) throw new Error('找不到視訊軌');
+
+  // 2. Get avcC description
+  const avcC = mp4file.getTrackById(vt.id)
+    ?.mdia?.minf?.stbl?.stsd?.entries?.[0]?.avcC;
+  const avcCData = avcC ? avcC.write(new DataStream(undefined, 0, DataStream.BIG_ENDIAN)) : null;
+
+  // 3. Use our binary parser to get sample positions
+  const pVt = parseVideoTrackFull(
+    await (async () => {
+      const SCAN2 = Math.min(10 * 1024 * 1024, file.size);
+      const headBuf = await readFileSlice(file, 0, SCAN2);
+      let moovBuf = null;
+      const v = new DataView(headBuf);
+      let off = 0;
+      while (off + 8 <= headBuf.byteLength) {
+        const sz = readU32(v, off), nm = read4cc(v, off + 4);
+        if (sz < 8) break;
+        if (nm === 'moov') { moovBuf = headBuf.slice(off, Math.min(off + sz, headBuf.byteLength)); break; }
+        off += sz;
+      }
+      if (!moovBuf && file.size > SCAN2) {
+        const tail = await readFileSlice(file, file.size - SCAN2, file.size);
+        const tv = new DataView(tail);
+        for (let i = 4; i + 8 <= tail.byteLength; i++) {
+          if (read4cc(tv, i) === 'moov') {
+            moovBuf = tail.slice(i - 4, Math.min(i - 4 + readU32(tv, i - 4), tail.byteLength)); break;
+          }
+        }
+      }
+      return moovBuf;
+    })()
+  );
+  if (!pVt) throw new Error('無法解析視訊軌');
+
+  const { timescale, stts, stsc, stco, stsz, stss, ctts, fixedSampleSize } = pVt;
   const TC = stco.length;
 
   function spc(ci) {
@@ -1980,11 +2013,7 @@ async function mp4boxClip(file, clipIn, clipOut, onProgress) {
     }
     return Math.min(s, TS);
   }
-  function sampleSz(si) { return fixedSampleSize > 0 ? fixedSampleSize : (si < stsz.length ? stsz[si] : 0); }
-
-  // Build DTS table
-  const sampleDTS = [];
-  { let t = 0; for (const e of stts) { for (let i = 0; i < e.count; i++) { sampleDTS.push(t); t += e.delta; } } }
+  function sSize(si) { return fixedSampleSize > 0 ? fixedSampleSize : (si < stsz.length ? stsz[si] : 0); }
 
   // Snap start to keyframe
   let s0 = time2s(clipIn);
@@ -1994,98 +2023,76 @@ async function mp4boxClip(file, clipIn, clipOut, onProgress) {
     s0 = kf;
   }
   const s1 = Math.min(TS, time2s(clipOut));
-  if (s0 >= s1) throw new Error('剪輯範圍無效');
 
-  // Find chunk range
-  let c0 = 0;
-  for (let c = 0; c < TC - 1; c++) { if (css[c + 1] > s0) break; c0 = c + 1; }
-  c0 = Math.min(c0, TC - 1);
-  let c1 = c0;
-  for (let c = c0; c < TC; c++) { c1 = c; if (css[c] + spc(c) >= s1) break; }
+  // Build DTS table
+  const dtsArr = new Float64Array(s1);
+  { let t = 0, si = 0; for (const e of stts) { for (let i = 0; i < e.count && si < s1; i++) { dtsArr[si++] = t; t += e.delta; } } }
 
-  // Build per-sample byte offsets within their chunks
-  // Read all needed bytes in one shot
-  const byteStart = stco[c0];
-  let byteEnd = c1 + 1 < TC ? stco[c1 + 1]
-    : stco[c1] + (() => { let b = 0, n = spc(c1); for (let i = 0; i < n; i++) b += sampleSz(css[c1] + i); return b; })();
-  byteEnd = Math.min(byteEnd, file.size);
-
-  onProgress && onProgress(0.05);
-  const rawBuf = new Uint8Array(await readFileSlice(file, byteStart, byteEnd));
-  onProgress && onProgress(0.4);
-
-  // Step 3: Build sample list with byte offsets in rawBuf
-  function sampleOffset(si) {
-    // Find which chunk this sample is in
-    let cumSamples = css[c0];
-    for (let c = c0; c <= c1; c++) {
-      const n = spc(c);
-      if (cumSamples + n > si) {
-        // sample si is in chunk c
-        let off = stco[c] - byteStart;
-        for (let i = cumSamples; i < si; i++) off += sampleSz(i);
-        return off;
-      }
-      cumSamples += n;
+  // ctts lookup
+  const ctsOffset = new Int32Array(s1);
+  if (ctts && ctts.length) {
+    let si = 0;
+    for (const e of ctts) {
+      for (let i = 0; i < e.count && si < s1; i++) ctsOffset[si++] = e.offset;
     }
-    return 0;
   }
 
   const stssSet = new Set(stss);
-  const samples = [];
-  const startDTS = sampleDTS[s0] || 0;
+
+  // 4. Collect sample metadata (byte positions)
+  const sampleMeta = [];
   for (let si = s0; si < s1; si++) {
-    const off = sampleOffset(si);
-    const sz  = sampleSz(si);
-    samples.push({
-      data:    rawBuf.slice(off, off + sz),
-      dts:     sampleDTS[si] - startDTS,
-      is_sync: stssSet.size === 0 || stssSet.has(si),
-      duration: si + 1 < sampleDTS.length ? sampleDTS[si + 1] - sampleDTS[si] : (stts[stts.length-1]?.delta || 1),
+    // Find chunk and offset within chunk
+    let chunk = 0;
+    for (let c = 0; c < TC - 1; c++) { if (css[c+1] > si) break; chunk = c + 1; }
+    chunk = Math.min(chunk, TC - 1);
+    let byteOff = stco[chunk];
+    for (let j = css[chunk]; j < si; j++) byteOff += sSize(j);
+    sampleMeta.push({
+      byteOff, sz: sSize(si),
+      dts: dtsArr[si] - dtsArr[s0],
+      cts: (dtsArr[si] + ctsOffset[si]) - (dtsArr[s0] + ctsOffset[s0]),
+      dur: si + 1 < s1 ? dtsArr[si+1] - dtsArr[si] : (stts.length ? stts[stts.length-1].delta : 1),
+      isSync: stssSet.size === 0 || stssSet.has(si),
     });
   }
-  onProgress && onProgress(0.7);
 
-  // Step 4: Find avcC
-  let avcCData = null;
-  for (let i = 4; i + 8 <= moovBytes.length; i++) {
-    if (moovBytes[i]===0x61&&moovBytes[i+1]===0x76&&moovBytes[i+2]===0x63&&moovBytes[i+3]===0x43) {
-      const sz = (moovBytes[i-4]<<24|moovBytes[i-3]<<16|moovBytes[i-2]<<8|moovBytes[i-1])>>>0;
-      avcCData = moovBytes.slice(i - 4, i - 4 + sz); // full avcC box including size+name
-      break;
-    }
-  }
+  // 5. Read all sample bytes in one contiguous read
+  const byteStart = sampleMeta[0].byteOff;
+  const byteEnd   = Math.min(sampleMeta[sampleMeta.length-1].byteOff + sampleMeta[sampleMeta.length-1].sz, file.size);
+  onProgress && onProgress(0.1);
+  const rawBuf = new Uint8Array(await readFileSlice(file, byteStart, byteEnd));
+  onProgress && onProgress(0.5);
 
-  // Step 5: Use mp4box.js to build output
+  // 6. Build output with mp4box.js
   const outFile = MP4Box.createFile();
-  const trackId = outFile.addTrack({
-    timescale: timescale,
-    width:     video.videoWidth,
-    height:    video.videoHeight,
-    brands:    ['isom','iso2','avc1','mp41'],
-    hdlr:      'vide',
-    name:      'VideoHandler',
-    type:      'avc1',
-    description_boxes: avcCData ? [{ type: 'avcC', data: avcCData }] : [],
+  const trackOpts = {
+    timescale,
+    width:  vt.video.width,
+    height: vt.video.height,
+    hdlr:   'vide',
+    name:   'VideoHandler',
+    type:   'avc1',
+  };
+  if (avcCData) trackOpts.avcDecoderConfigRecord = new Uint8Array(avcCData.buffer);
+
+  const newTid = outFile.addTrack(trackOpts);
+
+  sampleMeta.forEach((s, i) => {
+    const data = rawBuf.slice(s.byteOff - byteStart, s.byteOff - byteStart + s.sz);
+    outFile.addSample(newTid, data.buffer, {
+      duration: s.dur,
+      dts:      s.dts,
+      cts:      s.cts,
+      is_sync:  s.isSync,
+    });
+    if (onProgress && i % 30 === 0) onProgress(0.5 + (i / sampleMeta.length) * 0.45);
   });
 
-  for (let i = 0; i < samples.length; i++) {
-    const s = samples[i];
-    outFile.addSample(trackId, s.data.buffer, {
-      duration: s.duration,
-      dts:      s.dts,
-      cts:      s.dts,
-      is_sync:  s.is_sync,
-    });
-    if (i % 30 === 0) onProgress && onProgress(0.7 + (i / samples.length) * 0.28);
-  }
-
-  // Write output
-  const stream = new DataStream(undefined, 0, DataStream.BIG_ENDIAN);
-  outFile.write(stream);
+  const ds = new DataStream(undefined, 0, DataStream.BIG_ENDIAN);
+  outFile.write(ds);
   onProgress && onProgress(1);
-
-  return new Blob([stream.buffer], { type: 'video/mp4' });
+  return new Blob([ds.buffer], { type: 'video/mp4' });
 }
 
 
