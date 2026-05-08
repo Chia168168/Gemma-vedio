@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#0a0a0c">
 <title>影片播放器</title>
 <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.3/build/mp4-muxer.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mp4box@0.5.2/dist/mp4box.all.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Space+Grotesk:wght@300;400;600&display=swap');
 
@@ -1894,75 +1894,26 @@ document.getElementById('loop-export').addEventListener('click', async e => {
   savePendingClip();
   exportCancelled = false;
   exportOverlay.classList.add('show');
-  exportStatus.textContent = '準備剪輯…';
-  exportProgressF.style.width = '0%';
+  exportStatus.textContent = '分析影片結構…';
+  exportProgressF.style.width = '5%';
 
   try {
     const base = currentFile.name.replace(/\.[^.]+$/, '') || 'clip';
     const ss   = loopIn.toFixed(3);
-    const dur  = loopOut - loopIn;
-    const srcExt = (currentFile.name.split('.').pop() || 'mp4').toLowerCase();
-    const formatSel = document.getElementById('export-format').value;
-    const outExt = formatSel === 'original' ? srcExt : formatSel;
 
-    // ── MediaRecorder approach: play + record ──
-    if (typeof MediaRecorder !== 'undefined' && outExt === srcExt) {
-      const blob = await recordClip(dur);
-      if (!blob) throw new Error('錄製失敗');
-      exportProgressF.style.width = '100%';
-      exportStatus.textContent = '完成！';
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = `${base}_clip_${ss.replace('.','_')}.mp4`;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 3000);
-      setTimeout(() => exportOverlay.classList.remove('show'), 1500);
-      showToast('剪輯完成');
-      clearPendingClip();
-      return;
-    }
-
-    // ── FFmpeg fallback ──
-    const { createFFmpeg, fetchFile } = FFmpeg;
     exportStatus.textContent = '提取片段…';
-    let inputBlob;
-    try { inputBlob = await extractClipBlob(currentFile, loopIn, loopOut); }
-    catch(e2) { inputBlob = currentFile; }
-    exportProgressF.style.width = '20%';
-    exportStatus.textContent = `片段 ${(inputBlob.size/1024/1024).toFixed(0)}MB，載入 FFmpeg…`;
+    exportProgressF.style.width = '10%';
 
-    if (!ffmpegInstance) {
-      ffmpegInstance = createFFmpeg({ log: false, corePath: window.location.origin + '/ffmpeg/ffmpeg-core.js' });
-    }
-    if (!ffmpegLoaded) { await ffmpegInstance.load(); ffmpegLoaded = true; }
-    ffmpegInstance.setProgress(({ ratio }) => {
-      if (ratio >= 0) exportProgressF.style.width = Math.min(95, 25 + Math.round(ratio * 70)) + '%';
-    });
-    if (exportCancelled) { exportOverlay.classList.remove('show'); return; }
+    const blob = await mp4boxClip(currentFile, loopIn, loopOut,
+      pct => { exportProgressF.style.width = (10 + pct * 85) + '%'; });
 
-    const inName = 'input.' + srcExt, outName = 'clip.mp4';
-    ffmpegInstance.FS('writeFile', inName, await fetchFile(inputBlob));
-    // Always re-encode to H.264 MP4 — iOS can seek properly in re-encoded output
-    await ffmpegInstance.run(
-      '-ss', ss, '-i', inName, '-t', dur.toFixed(3),
-      '-map', '0:v:0', '-map', '0:a:0?',
-      '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '18',
-      '-pix_fmt', 'yuv420p',
-      '-c:a', 'aac', '-b:a', '128k',
-      '-movflags', '+faststart',
-      outName
-    );
-    const data = ffmpegInstance.FS('readFile', outName);
-    const blob = new Blob([data.buffer], { type: 'video/mp4' });
-    try { ffmpegInstance.FS('unlink', inName); } catch(_) {}
-    try { ffmpegInstance.FS('unlink', outName); } catch(_) {}
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `${base}_clip_${ss.replace('.','_')}.mp4`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 3000);
     exportProgressF.style.width = '100%';
     exportStatus.textContent = '完成！';
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `${base}_clip_${ss.replace('.', '_')}.mp4`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
     setTimeout(() => exportOverlay.classList.remove('show'), 1500);
     showToast('剪輯完成');
     clearPendingClip();
@@ -1974,290 +1925,123 @@ document.getElementById('loop-export').addEventListener('click', async e => {
   }
 });
 
-// ── MediaRecorder clip: seek to IN, play to OUT, record ──
-async function recordClip(dur) {
+// ── mp4box.js clip extraction ──
+async function mp4boxClip(file, clipIn, clipOut, onProgress) {
   return new Promise(async (resolve, reject) => {
-    // Seek to IN point first
-    await seekExact(loopIn);
+    // 1. Feed file to mp4box in chunks (head first, auto-requests more)
+    const CHUNK = 4 * 1024 * 1024;
+    const mp4 = MP4Box.createFile();
+    let videoTrackId = null;
+    let info = null;
+    let samples = [];
+    let extractDone = false;
 
-    // Get stream from video element
-    let stream;
-    try {
-      stream = video.captureStream ? video.captureStream() : video.mozCaptureStream();
-    } catch(e) { reject(new Error('不支援 captureStream')); return; }
+    mp4.onError = e => reject(new Error('mp4box 解析失敗: ' + e));
 
-    // Pick best supported format
-    const mimeTypes = ['video/mp4;codecs=avc1','video/mp4','video/webm;codecs=vp9','video/webm'];
-    const mimeType = mimeTypes.find(m => MediaRecorder.isTypeSupported(m)) || '';
+    mp4.onReady = function(i) {
+      info = i;
+      // Find video track
+      const vt = i.tracks.find(t => t.type === 'video');
+      if (!vt) { reject(new Error('找不到視訊軌')); return; }
+      videoTrackId = vt.id;
 
-    const chunks = [];
-    const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
-    recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-    recorder.onstop = () => resolve(new Blob(chunks, { type: recorder.mimeType }));
-    recorder.onerror = e => reject(e.error || new Error('錄製錯誤'));
+      // Set extraction options for clip time range
+      mp4.setExtractionOptions(videoTrackId, null, {
+        nbSamples: Infinity,
+        rapAlignment: true,  // align to keyframe
+      });
+      mp4.start();
+    };
 
-    recorder.start(100); // collect every 100ms
-
-    // Play video
-    video.playbackRate = 1;
-    video.play();
-    setPlayIcon(true); isPlaying = true;
-
-    // Update progress bar during recording
-    const startTime = performance.now();
-    const interval = setInterval(() => {
-      if (exportCancelled) { clearInterval(interval); recorder.stop(); video.pause(); return; }
-      const elapsed = (performance.now() - startTime) / 1000;
-      exportProgressF.style.width = Math.min(95, Math.round((elapsed / dur) * 100)) + '%';
-      exportStatus.textContent = `錄製中… ${elapsed.toFixed(1)}s / ${dur.toFixed(1)}s`;
-    }, 200);
-
-    // Stop at OUT point
-    const checkEnd = setInterval(() => {
-      if (exportCancelled || video.currentTime >= loopOut - 0.05) {
-        clearInterval(checkEnd); clearInterval(interval);
-        video.pause(); setPlayIcon(false); isPlaying = false;
-        recorder.stop();
+    mp4.onSamples = function(trackId, user, s) {
+      if (trackId !== videoTrackId) return;
+      // Filter samples within clip range (in seconds)
+      const ts = info.tracks.find(t => t.id === trackId).timescale;
+      const inTick  = Math.round(clipIn  * ts);
+      const outTick = Math.round(clipOut * ts);
+      for (const sample of s) {
+        if (sample.dts >= outTick) { extractDone = true; mp4.stop(); break; }
+        if (sample.dts >= inTick || (sample.is_sync && sample.dts >= inTick - ts)) {
+          samples.push(sample);
+        }
       }
-    }, 50);
+      if (extractDone) buildOutput();
+    };
 
-    // Safety timeout
-    setTimeout(() => {
-      clearInterval(checkEnd); clearInterval(interval);
-      if (recorder.state === 'recording') { video.pause(); recorder.stop(); }
-    }, (dur + 5) * 1000);
+    // Feed file progressively
+    let offset = 0;
+    async function feedNext() {
+      if (extractDone) return;
+      const end = Math.min(offset + CHUNK, file.size);
+      const buf = await readFileSlice(file, offset, end);
+      buf.fileStart = offset;
+      const nextOffset = mp4.appendBuffer(buf);
+      offset = (nextOffset !== undefined && nextOffset > offset) ? nextOffset : end;
+      if (offset < file.size && !extractDone) {
+        setTimeout(feedNext, 0);
+      } else if (!extractDone) {
+        mp4.flush();
+        setTimeout(() => { if (!extractDone) { extractDone = true; buildOutput(); } }, 500);
+      }
+    }
+    feedNext();
+
+    function buildOutput() {
+      try {
+        if (!samples.length) { reject(new Error('沒有找到 sample')); return; }
+
+        const vt = info.tracks.find(t => t.id === videoTrackId);
+        const ts = vt.timescale;
+
+        // Snap start to first sample's DTS
+        const startDTS = samples[0].dts;
+        const startCTS = samples[0].cts;
+
+        // Build output mp4box file
+        const out = MP4Box.createFile();
+        const trakOpts = {
+          timescale: ts,
+          width:  vt.video.width,
+          height: vt.video.height,
+          hdlr:   'vide',
+          name:   'VideoHandler',
+          type:   vt.codec.startsWith('avc') ? 'avc1' : 'hvc1',
+          avcDecoderConfigRecord: samples[0].description.avcC ?
+            samples[0].description.avcC._data : undefined,
+        };
+        const newTrackId = out.addTrack(trakOpts);
+
+        const total = samples.length;
+        samples.forEach((s, i) => {
+          out.addSample(newTrackId, s.data, {
+            duration: s.duration,
+            dts:      s.dts - startDTS,
+            cts:      s.cts - startCTS,
+            is_sync:  s.is_sync,
+          });
+          if (onProgress && i % 20 === 0) onProgress(i / total);
+        });
+
+        // Write to ArrayBuffer
+        out.save('clip.mp4'); // triggers download in some envs
+        const ab = out.getBuffer ? out.getBuffer() : null;
+        if (!ab) {
+          // Alternative: use writeFile approach
+          const stream = new DataStream(undefined, 0, DataStream.BIG_ENDIAN);
+          out.write(stream);
+          resolve(new Blob([stream.buffer], { type: 'video/mp4' }));
+        } else {
+          resolve(new Blob([ab], { type: 'video/mp4' }));
+        }
+        onProgress && onProgress(1);
+      } catch(e) {
+        reject(e);
+      }
+    }
   });
 }
 
-exportCancelBtn.addEventListener('click', () => {
-  exportCancelled = true;
-  if (ffmpegInstance) { try { ffmpegInstance.exit(); } catch(e) {} }
-  ffmpegInstance = null;
-  ffmpegLoaded = false;
-  exportOverlay.classList.remove('show');
-  showToast('已取消');
-});
 
-// ── Convert only (no clip, -c copy) ──
-document.getElementById('loop-convert').addEventListener('click', async e => {
-  e.stopPropagation();
-  if (!currentFile) { showToast('沒有影片檔案'); return; }
-
-  const formatSel = document.getElementById('export-format').value;
-  const srcExt = currentFile.name.split('.').pop().toLowerCase();
-  const outExt = formatSel === 'original' ? srcExt : formatSel;
-
-  if (outExt === srcExt) {
-    showToast('格式相同，無需轉換'); return;
-  }
-
-  const base = currentFile.name.replace(/\.[^.]+$/, '') || 'video';
-
-  // iPhone MOV ↔ MP4: both are ISOBMFF containers — just rebrand, no FFmpeg needed
-  const isISOSwap = (srcExt === 'mov' && outExt === 'mp4') ||
-                    (srcExt === 'mp4' && outExt === 'mov');
-  if (isISOSwap) {
-    const mimeType = outExt === 'mp4' ? 'video/mp4' : 'video/quicktime';
-    const blob = new Blob([currentFile], { type: mimeType });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href = url;
-    a.download = `${base}.${outExt}`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 3000);
-    showToast(`轉換完成 → ${outExt.toUpperCase()}`);
-    return;
-  }
-
-  // Other format conversions: use FFmpeg
-  const sizeMB2 = currentFile.size / 1024 / 1024;
-  const isIOS2 = /iP(hone|ad|od)/.test(navigator.userAgent);
-  const limitMB2 = isIOS2 ? 200 : 800;
-  if (sizeMB2 > limitMB2) {
-    showToast(`檔案 ${sizeMB2.toFixed(0)}MB 太大，${isIOS2 ? 'iOS 建議 200MB 以下' : '建議 800MB 以下'}`);
-    return;
-  }
-
-  exportCancelled = false;
-  exportOverlay.classList.add('show');
-  exportStatus.textContent = '準備中…';
-  exportProgressF.style.width = '0%';
-
-  try {
-    const { createFFmpeg, fetchFile } = FFmpeg;
-
-    if (!ffmpegInstance) {
-      ffmpegInstance = createFFmpeg({
-        log: false,
-        corePath: window.location.origin + '/ffmpeg/ffmpeg-core.js',
-      });
-    }
-    if (!ffmpegLoaded) {
-      exportStatus.textContent = '載入 FFmpeg…（首次約需 30 秒）';
-      await ffmpegInstance.load();
-      ffmpegLoaded = true;
-    }
-
-    if (exportCancelled) { exportOverlay.classList.remove('show'); return; }
-
-    exportStatus.textContent = '寫入檔案…';
-    exportProgressF.style.width = '10%';
-
-    const inName = 'input.' + srcExt;
-    ffmpegInstance.FS('writeFile', inName, await fetchFile(currentFile));
-
-    if (exportCancelled) { exportOverlay.classList.remove('show'); return; }
-
-    exportStatus.textContent = `轉換 ${srcExt.toUpperCase()} → ${outExt.toUpperCase()}…`;
-    exportProgressF.style.width = '20%';
-
-    const outName = 'output.' + outExt;
-    await ffmpegInstance.run(
-      '-i', inName,
-      '-c', 'copy',
-      '-movflags', '+faststart',
-      outName
-    );
-
-    if (exportCancelled) { exportOverlay.classList.remove('show'); return; }
-
-    exportProgressF.style.width = '95%';
-    exportStatus.textContent = '輸出中…';
-
-    const mimeType = outExt === 'mov' ? 'video/quicktime' : 'video/mp4';
-    const data = ffmpegInstance.FS('readFile', outName);
-    const blob = new Blob([data.buffer], { type: mimeType });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href = url;
-    a.download = `${base}.${outExt}`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 3000);
-
-    try { ffmpegInstance.FS('unlink', inName); } catch(e) {}
-    try { ffmpegInstance.FS('unlink', outName); } catch(e) {}
-
-    exportProgressF.style.width = '100%';
-    exportStatus.textContent = '完成！';
-    setTimeout(() => exportOverlay.classList.remove('show'), 1500);
-    showToast(`轉換完成 → ${outExt.toUpperCase()}`);
-    localStorage.removeItem('pendingClip');
-
-  } catch(err) {
-    exportOverlay.classList.remove('show');
-    showToast('轉換失敗：' + (err.message || err));
-  }
-});
-
-// ── Pending clip: save before export, clear after, resume on reload ──
-function savePendingClip() {
-  if (loopIn === null || loopOut === null || !currentFile) return;
-  const existing = JSON.parse(localStorage.getItem('pendingClip') || '{}');
-  const crashCount = (existing.crashCount || 0) + 1;
-  localStorage.setItem('pendingClip', JSON.stringify({
-    loopIn, loopOut,
-    fileName: currentFile.name,
-    fileSize: currentFile.size,
-    format: document.getElementById('export-format').value,
-    crashCount,
-  }));
-}
-
-function clearPendingClip() {
-  localStorage.removeItem('pendingClip');
-}
-
-// Check for pending clip on load
-window.addEventListener('load', () => {
-  const raw = localStorage.getItem('pendingClip');
-  if (!raw) return;
-  try {
-    const p = JSON.parse(raw);
-    const crashCount = p.crashCount || 1;
-
-    // If crashed too many times, show warning instead of auto-retry option
-    const tooManyCrashes = crashCount >= 2;
-
-    const banner = document.createElement('div');
-    banner.id = 'resume-banner';
-    banner.style.cssText = `
-      position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
-      z-index: 99999; background: rgba(10,10,12,0.95);
-      border: 1.5px solid rgba(200,255,71,0.4);
-      border-radius: 14px; padding: 14px 18px; max-width: 320px; width: 90%;
-      font-family: 'DM Mono', monospace; font-size: 12px; color: #fff;
-      text-align: center; line-height: 1.7;
-    `;
-    banner.innerHTML = `
-      <div style="color:var(--accent);font-size:13px;margin-bottom:6px">
-        ${tooManyCrashes ? '⚠ 多次中斷，建議改用電腦' : '⚠ 上次剪輯未完成'}
-      </div>
-      <div style="color:rgba(255,255,255,0.6);margin-bottom:10px">
-        ${p.fileName}<br>
-        IN ${formatTime(p.loopIn)} → OUT ${formatTime(p.loopOut)}<br>
-        ${tooManyCrashes ? `<span style="color:rgba(255,100,100,0.8)">已中斷 ${crashCount} 次，檔案可能太大</span>` : ''}
-      </div>
-      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
-        ${!tooManyCrashes ? `<button id="resume-select" style="
-          background:transparent;border:1.5px solid rgba(200,255,71,0.5);
-          border-radius:100px;padding:6px 14px;color:var(--accent);
-          font-family:'DM Mono',monospace;font-size:12px;cursor:pointer;">
-          重新選擇繼續
-        </button>` : ''}
-        <button id="resume-cancel" style="
-          background:transparent;border:1.5px solid rgba(255,255,255,0.15);
-          border-radius:100px;padding:6px 14px;color:rgba(255,255,255,0.4);
-          font-family:'DM Mono',monospace;font-size:12px;cursor:pointer;">
-          ${tooManyCrashes ? '清除記錄' : '取消'}
-        </button>
-      </div>
-    `;
-    document.body.appendChild(banner);
-
-    document.getElementById('resume-cancel').addEventListener('click', () => {
-      clearPendingClip();
-      banner.remove();
-    });
-
-    if (!tooManyCrashes) {
-      document.getElementById('resume-select').addEventListener('click', () => {
-        banner.remove();
-        const inp = document.createElement('input');
-        inp.type = 'file'; inp.accept = 'video/*';
-        inp.style.display = 'none';
-        document.body.appendChild(inp);
-        inp.addEventListener('change', async () => {
-          const file = inp.files[0];
-          if (!file) { inp.remove(); return; }
-          if (file.name !== p.fileName || file.size !== p.fileSize) {
-            inp.remove();
-            showToast('請選擇同一支影片：' + p.fileName); return;
-          }
-          // Keep inp in DOM until loadVideoFile completes — removing it too early
-          // invalidates the File object on iOS Safari
-          inp.style.display = 'none';
-          loadVideoFile(file);
-          video.addEventListener('canplay', async function once() {
-            video.removeEventListener('canplay', once);
-            loopIn = p.loopIn;
-            loopOut = p.loopOut;
-            loopSetInBtn.classList.add('set');
-            loopSetOutBtn.classList.add('set');
-            updateLoopOverlay();
-            document.getElementById('export-format').value = p.format || 'original';
-            await new Promise(r => setTimeout(r, 500));
-            inp.remove(); // safe to remove now
-            window._resumeSkipSizeCheck = true;
-            document.getElementById('loop-export').click();
-          }, { once: true });
-        });
-        inp.click();
-      });
-    }
-  } catch(e) {
-    clearPendingClip();
-  }
-});
 </script>
 
 </body>
