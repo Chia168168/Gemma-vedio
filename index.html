@@ -1940,25 +1940,25 @@ document.getElementById('loop-export').addEventListener('click', async e => {
     });
     if (exportCancelled) { exportOverlay.classList.remove('show'); return; }
 
-    const inName = 'input.' + srcExt, outName = 'clip.' + outExt;
+    const inName = 'input.' + srcExt, outName = 'clip.mp4';
     ffmpegInstance.FS('writeFile', inName, await fetchFile(inputBlob));
-    const to  = loopOut.toFixed(3);
-    if (outExt !== srcExt) {
-      await ffmpegInstance.run('-ss', ss, '-i', inName, '-t', dur.toFixed(3),
-        '-map','0:v:0','-map','0:a:0?',
-        '-c:v','libx264','-preset','ultrafast','-crf','18',
-        '-c:a','aac','-b:a','128k','-movflags','+faststart', outName);
-    } else {
-      await ffmpegInstance.run('-ss', ss, '-to', to, '-i', inName, '-t', dur.toFixed(3),
-        '-map','0:v:0','-map','0:a:0?','-c','copy', outName);
-    }
+    // Always re-encode to H.264 MP4 — iOS can seek properly in re-encoded output
+    await ffmpegInstance.run(
+      '-ss', ss, '-i', inName, '-t', dur.toFixed(3),
+      '-map', '0:v:0', '-map', '0:a:0?',
+      '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '18',
+      '-pix_fmt', 'yuv420p',
+      '-c:a', 'aac', '-b:a', '128k',
+      '-movflags', '+faststart',
+      outName
+    );
     const data = ffmpegInstance.FS('readFile', outName);
-    const blob = new Blob([data.buffer], { type: outExt==='mov'?'video/quicktime':'video/mp4' });
+    const blob = new Blob([data.buffer], { type: 'video/mp4' });
     try { ffmpegInstance.FS('unlink', inName); } catch(_) {}
     try { ffmpegInstance.FS('unlink', outName); } catch(_) {}
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `${base}_clip_${ss.replace('.','_')}.${outExt}`;
+    a.href = url; a.download = `${base}_clip_${ss.replace('.','_')}.mp4`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 3000);
     exportProgressF.style.width = '100%';
