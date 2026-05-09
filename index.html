@@ -1888,8 +1888,10 @@ let exportCancelled = false;
 
 document.getElementById('loop-export').addEventListener('click', async e => {
   e.stopPropagation();
-  if (loopIn === null || loopOut === null) { showToast('請先設定 IN / OUT'); return; }
-  if (!currentFile) { showToast('沒有影片檔案'); return; }
+  showToast('開始剪輯…', 6000);
+  if (loopIn === null || loopOut === null) { showToast('請先設定 IN / OUT', 4000); return; }
+  if (!currentFile) { showToast('沒有影片檔案', 4000); return; }
+  alert('剪輯按下 loopIn=' + loopIn + ' loopOut=' + loopOut);
 
   savePendingClip();
   exportCancelled = false;
@@ -1904,9 +1906,12 @@ document.getElementById('loop-export').addEventListener('click', async e => {
 
     exportStatus.textContent = '提取片段…';
     exportProgressF.style.width = '10%';
+    showToast('呼叫 mp4boxClip…', 6000);
 
     const blob = await mp4boxClip(currentFile, loopIn, loopOut,
       pct => { exportProgressF.style.width = (10 + pct * 85) + '%'; });
+
+    showToast(`blob 大小: ${(blob.size/1024/1024).toFixed(1)}MB`, 5000);
 
     exportProgressF.style.width = '100%';
     exportStatus.textContent = '完成！';
@@ -1928,30 +1933,32 @@ document.getElementById('loop-export').addEventListener('click', async e => {
 
 // ── mp4box.js clip extraction ──
 async function mp4boxClip(file, clipIn, clipOut, onProgress) {
+  showToast('mp4boxClip 開始', 4000);
   const SCAN = Math.min(10 * 1024 * 1024, file.size);
 
-  // 1. Feed head (and tail if needed) to mp4box just to get moov info + avcC
+  // 1. Feed head to mp4box to get moov info
   const mp4info = await new Promise(async (resolve, reject) => {
     const mp4 = MP4Box.createFile();
     mp4.onError = e => reject(new Error('解析失敗: ' + e));
-    mp4.onReady = info => resolve({ info, file: mp4 });
+    mp4.onReady = info => { showToast('mp4box onReady OK', 3000); resolve({ info, file: mp4 }); };
 
+    showToast('讀取頭部…', 3000);
     const headBuf = await readFileSlice(file, 0, SCAN);
     headBuf.fileStart = 0;
     mp4.appendBuffer(headBuf);
     mp4.flush();
 
-    // If onReady didn't fire, try tail
     setTimeout(async () => {
       if (file.size > SCAN) {
+        showToast('讀取尾部…', 3000);
         const tailBuf = await readFileSlice(file, file.size - SCAN, file.size);
         tailBuf.fileStart = file.size - SCAN;
         mp4.appendBuffer(tailBuf);
         mp4.flush();
       }
-    }, 200);
+    }, 300);
 
-    setTimeout(() => reject(new Error('解析超時')), 8000);
+    setTimeout(() => reject(new Error('mp4box 解析超時')), 10000);
   });
 
   const { info, file: mp4file } = mp4info;
