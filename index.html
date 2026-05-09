@@ -1924,8 +1924,12 @@ document.getElementById('loop-export').addEventListener('click', async e => {
     clearPendingClip();
 
   } catch(err) {
-    exportOverlay.classList.remove('show');
-    showToast('剪輯失敗：' + (err?.message || err?.toString() || '未知'), 6000);
+    const msg = err?.message || err?.toString() || '未知';
+    exportStatus.textContent = '失敗：' + msg;
+    exportProgressF.style.width = '0%';
+    // Keep overlay visible so user can read error
+    setTimeout(() => exportOverlay.classList.remove('show'), 8000);
+    showToast('剪輯失敗：' + msg, 8000);
     clearPendingClip();
   }
 });
