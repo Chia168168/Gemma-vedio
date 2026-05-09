@@ -1891,7 +1891,6 @@ document.getElementById('loop-export').addEventListener('click', async e => {
   showToast('開始剪輯…', 6000);
   if (loopIn === null || loopOut === null) { showToast('請先設定 IN / OUT', 4000); return; }
   if (!currentFile) { showToast('沒有影片檔案', 4000); return; }
-  alert('剪輯按下 loopIn=' + loopIn + ' loopOut=' + loopOut);
 
   savePendingClip();
   exportCancelled = false;
