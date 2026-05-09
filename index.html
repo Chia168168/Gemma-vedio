@@ -670,11 +670,11 @@ function formatTime(s) {
   const sec = (s % 60).toFixed(3);
   return `${String(m).padStart(2,'0')}:${sec.padStart(6,'0')}`;
 }
-function showToast(msg) {
+function showToast(msg, duration_ms) {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2200);
+  setTimeout(() => t.classList.remove('show'), duration_ms || 2200);
 }
 function updateUI() {
   const ct = video.currentTime;
@@ -1898,6 +1898,7 @@ document.getElementById('loop-export').addEventListener('click', async e => {
   exportProgressF.style.width = '5%';
 
   try {
+    if (typeof MP4Box === 'undefined') throw new Error('MP4Box 未載入');
     const base = currentFile.name.replace(/\.[^.]+$/, '') || 'clip';
     const ss   = loopIn.toFixed(3);
 
@@ -1920,7 +1921,7 @@ document.getElementById('loop-export').addEventListener('click', async e => {
 
   } catch(err) {
     exportOverlay.classList.remove('show');
-    showToast('剪輯失敗：' + (err?.message || err?.toString() || '未知'));
+    showToast('剪輯失敗：' + (err?.message || err?.toString() || '未知'), 6000);
     clearPendingClip();
   }
 });
