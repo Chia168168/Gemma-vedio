@@ -1886,52 +1886,60 @@ let ffmpegInstance = null;
 let ffmpegLoaded = false;
 let exportCancelled = false;
 
-document.getElementById('loop-export').addEventListener('click', async e => {
+document.getElementById('loop-export').addEventListener('click', e => {
   e.stopPropagation();
-  showToast('開始剪輯…', 6000);
-  if (loopIn === null || loopOut === null) { showToast('請先設定 IN / OUT', 4000); return; }
-  if (!currentFile) { showToast('沒有影片檔案', 4000); return; }
+  showToast('按下剪輯', 3000);
 
-  savePendingClip();
-  exportCancelled = false;
-  exportOverlay.classList.add('show');
-  exportStatus.textContent = '分析影片結構…';
-  exportProgressF.style.width = '5%';
+  Promise.resolve().then(async () => {
+    if (loopIn === null || loopOut === null) { showToast('請先設定 IN / OUT', 4000); return; }
+    if (!currentFile) { showToast('沒有影片檔案', 4000); return; }
 
-  try {
-    if (typeof MP4Box === 'undefined') throw new Error('MP4Box 未載入');
-    const base = currentFile.name.replace(/\.[^.]+$/, '') || 'clip';
-    const ss   = loopIn.toFixed(3);
+    savePendingClip();
+    exportCancelled = false;
 
-    exportStatus.textContent = '提取片段…';
-    exportProgressF.style.width = '10%';
-    showToast('呼叫 mp4boxClip…', 6000);
+    const overlay = document.getElementById('export-overlay');
+    const status  = document.getElementById('export-status');
+    const bar     = document.getElementById('export-progress-fill');
 
-    const blob = await mp4boxClip(currentFile, loopIn, loopOut,
-      pct => { exportProgressF.style.width = (10 + pct * 85) + '%'; });
+    if (!overlay) { showToast('找不到 overlay 元素', 6000); return; }
 
-    showToast(`blob 大小: ${(blob.size/1024/1024).toFixed(1)}MB`, 5000);
+    overlay.classList.add('show');
+    status.textContent = '準備中…';
+    bar.style.width = '5%';
 
-    exportProgressF.style.width = '100%';
-    exportStatus.textContent = '完成！';
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `${base}_clip_${ss.replace('.', '_')}.mp4`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 3000);
-    setTimeout(() => exportOverlay.classList.remove('show'), 1500);
-    showToast('剪輯完成');
-    clearPendingClip();
+    try {
+      if (typeof MP4Box === 'undefined') throw new Error('MP4Box 未載入，請檢查網路');
 
-  } catch(err) {
-    const msg = err?.message || err?.toString() || '未知';
-    exportStatus.textContent = '失敗：' + msg;
-    exportProgressF.style.width = '0%';
-    // Keep overlay visible so user can read error
-    setTimeout(() => exportOverlay.classList.remove('show'), 8000);
-    showToast('剪輯失敗：' + msg, 8000);
-    clearPendingClip();
-  }
+      const base = currentFile.name.replace(/\.[^.]+$/, '') || 'clip';
+      const ss   = loopIn.toFixed(3);
+
+      status.textContent = '提取片段…';
+      bar.style.width = '10%';
+
+      const blob = await mp4boxClip(currentFile, loopIn, loopOut,
+        pct => { bar.style.width = Math.round(10 + pct * 85) + '%'; });
+
+      bar.style.width = '100%';
+      status.textContent = '完成！';
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `${base}_clip_${ss.replace('.', '_')}.mp4`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 3000);
+      setTimeout(() => overlay.classList.remove('show'), 1500);
+      showToast('剪輯完成');
+      clearPendingClip();
+
+    } catch(err) {
+      const msg = err?.message || String(err) || '未知錯誤';
+      status.textContent = '失敗：' + msg;
+      bar.style.width = '0%';
+      setTimeout(() => overlay.classList.remove('show'), 10000);
+      clearPendingClip();
+    }
+  }).catch(err => {
+    showToast('頂層錯誤：' + (err?.message || String(err)), 8000);
+  });
 });
 
 // ── mp4box.js clip extraction ──
