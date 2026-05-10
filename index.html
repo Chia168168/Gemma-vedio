@@ -2016,10 +2016,9 @@ async function mp4boxClip(file, clipIn, clipOut, onProgress) {
     await scanForCodec(tailBuf2);
   }
 
-  status.textContent = decoderConfig
-    ? `codec: ${trackType} config: ${decoderConfig.byteLength} bytes`
-    : '找不到 avcC！';
-  await new Promise(r => setTimeout(r, 3000));
+  alert(decoderConfig
+    ? `找到 codec: ${trackType}\nconfig: ${decoderConfig.byteLength} bytes`
+    : '找不到 avcC/hvcC！');
 
   // 3. Use our binary parser to get sample positions
   const pVt = parseVideoTrackFull(
