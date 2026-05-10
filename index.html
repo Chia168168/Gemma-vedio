@@ -1886,6 +1886,23 @@ let ffmpegInstance = null;
 let ffmpegLoaded = false;
 let exportCancelled = false;
 
+// ── Pending clip persistence ──
+function savePendingClip() {
+  if (loopIn === null || loopOut === null || !currentFile) return;
+  try {
+    localStorage.setItem('pendingClip', JSON.stringify({
+      loopIn, loopOut,
+      fileName: currentFile.name,
+      fileSize: currentFile.size,
+      format: document.getElementById('export-format')?.value || 'original',
+      crashCount: (JSON.parse(localStorage.getItem('pendingClip') || '{}').crashCount || 0) + 1,
+    }));
+  } catch(e) {}
+}
+function clearPendingClip() {
+  try { localStorage.removeItem('pendingClip'); } catch(e) {}
+}
+
 document.getElementById('loop-export').addEventListener('click', e => {
   e.stopPropagation();
   showToast('按下剪輯', 3000);
