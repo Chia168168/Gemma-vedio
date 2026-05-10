@@ -1895,9 +1895,6 @@ document.getElementById('loop-export').addEventListener('click', e => {
     if (!currentFile) { showToast('沒有影片檔案', 4000); return; }
 
     savePendingClip();
-    exportCancelled = false;
-
-    const overlay = document.getElementById('export-overlay');
     const status  = document.getElementById('export-status');
     const bar     = document.getElementById('export-progress-fill');
 
