@@ -1991,23 +1991,35 @@ async function mp4boxClip(file, clipIn, clipOut, onProgress) {
   const vt = info.tracks.find(t => t.type === 'video');
   if (!vt) throw new Error('找不到視訊軌');
 
-  // 2. Get avcC/hvcC raw bytes and detect codec
+  // 2. Scan head AND tail for avcC/hvcC
   let decoderConfig = null;
   let trackType = 'avc1';
-  const scanBuf2 = new Uint8Array(await readFileSlice(file, 0, SCAN));
-  for (let i = 4; i + 8 <= scanBuf2.length; i++) {
-    const nm = String.fromCharCode(scanBuf2[i],scanBuf2[i+1],scanBuf2[i+2],scanBuf2[i+3]);
-    if (nm === 'avcC' || nm === 'hvcC') {
-      const sz = (scanBuf2[i-4]<<24|scanBuf2[i-3]<<16|scanBuf2[i-2]<<8|scanBuf2[i-1])>>>0;
-      if (sz >= 8) {
-        // Pass content only (after size+name), which is the raw decoder config record
-        decoderConfig = scanBuf2.slice(i + 4, i - 4 + sz).buffer;
-        trackType = nm === 'hvcC' ? 'hvc1' : 'avc1';
-        showToast(`codec: ${trackType} config: ${sz-8} bytes`, 3000);
-        break;
+
+  async function scanForCodec(buf) {
+    for (let i = 4; i + 8 <= buf.length; i++) {
+      const nm = String.fromCharCode(buf[i],buf[i+1],buf[i+2],buf[i+3]);
+      if (nm === 'avcC' || nm === 'hvcC') {
+        const sz = (buf[i-4]<<24|buf[i-3]<<16|buf[i-2]<<8|buf[i-1])>>>0;
+        if (sz >= 8) {
+          decoderConfig = buf.slice(i + 4, i - 4 + sz).buffer;
+          trackType = nm === 'hvcC' ? 'hvc1' : 'avc1';
+          return true;
+        }
       }
     }
+    return false;
   }
+
+  const headBuf2 = new Uint8Array(await readFileSlice(file, 0, SCAN));
+  if (!await scanForCodec(headBuf2) && file.size > SCAN) {
+    const tailBuf2 = new Uint8Array(await readFileSlice(file, file.size - SCAN, file.size));
+    await scanForCodec(tailBuf2);
+  }
+
+  status.textContent = decoderConfig
+    ? `codec: ${trackType} config: ${decoderConfig.byteLength} bytes`
+    : '找不到 avcC！';
+  await new Promise(r => setTimeout(r, 3000));
 
   // 3. Use our binary parser to get sample positions
   const pVt = parseVideoTrackFull(
