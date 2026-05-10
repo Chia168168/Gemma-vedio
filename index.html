@@ -1991,13 +1991,21 @@ async function mp4boxClip(file, clipIn, clipOut, onProgress) {
   const vt = info.tracks.find(t => t.type === 'video');
   if (!vt) throw new Error('找不到視訊軌');
 
-  // 2. Get avcC raw bytes by byte scan (most reliable)
-  let avcCRaw = null;
+  // 2. Get avcC/hvcC raw bytes and detect codec
+  let decoderConfig = null;
+  let trackType = 'avc1';
   const scanBuf2 = new Uint8Array(await readFileSlice(file, 0, SCAN));
   for (let i = 4; i + 8 <= scanBuf2.length; i++) {
-    if (scanBuf2[i]===0x61&&scanBuf2[i+1]===0x76&&scanBuf2[i+2]===0x63&&scanBuf2[i+3]===0x43) {
+    const nm = String.fromCharCode(scanBuf2[i],scanBuf2[i+1],scanBuf2[i+2],scanBuf2[i+3]);
+    if (nm === 'avcC' || nm === 'hvcC') {
       const sz = (scanBuf2[i-4]<<24|scanBuf2[i-3]<<16|scanBuf2[i-2]<<8|scanBuf2[i-1])>>>0;
-      if (sz >= 8) { avcCRaw = scanBuf2.slice(i + 4, i - 4 + sz).buffer; break; } // content only (after size+name)
+      if (sz >= 8) {
+        // Pass content only (after size+name), which is the raw decoder config record
+        decoderConfig = scanBuf2.slice(i + 4, i - 4 + sz).buffer;
+        trackType = nm === 'hvcC' ? 'hvc1' : 'avc1';
+        showToast(`codec: ${trackType} config: ${sz-8} bytes`, 3000);
+        break;
+      }
     }
   }
 
@@ -2111,9 +2119,12 @@ async function mp4boxClip(file, clipIn, clipOut, onProgress) {
     height: vt.video.height,
     hdlr:   'vide',
     name:   'VideoHandler',
-    type:   'avc1',
+    type:   trackType,
   };
-  if (avcCRaw) trackOpts.avcDecoderConfigRecord = avcCRaw;
+  if (decoderConfig) {
+    if (trackType === 'avc1') trackOpts.avcDecoderConfigRecord = decoderConfig;
+    else trackOpts.hevcDecoderConfigRecord = decoderConfig;
+  }
 
   const newTid = outFile.addTrack(trackOpts);
 
