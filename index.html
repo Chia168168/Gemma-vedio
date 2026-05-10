@@ -1991,10 +1991,15 @@ async function mp4boxClip(file, clipIn, clipOut, onProgress) {
   const vt = info.tracks.find(t => t.type === 'video');
   if (!vt) throw new Error('找不到視訊軌');
 
-  // 2. Get avcC description
-  const avcC = mp4file.getTrackById(vt.id)
-    ?.mdia?.minf?.stbl?.stsd?.entries?.[0]?.avcC;
-  const avcCData = avcC ? avcC.write(new DataStream(undefined, 0, DataStream.BIG_ENDIAN)) : null;
+  // 2. Get avcC raw bytes by byte scan (most reliable)
+  let avcCRaw = null;
+  const scanBuf2 = new Uint8Array(await readFileSlice(file, 0, SCAN));
+  for (let i = 4; i + 8 <= scanBuf2.length; i++) {
+    if (scanBuf2[i]===0x61&&scanBuf2[i+1]===0x76&&scanBuf2[i+2]===0x63&&scanBuf2[i+3]===0x43) {
+      const sz = (scanBuf2[i-4]<<24|scanBuf2[i-3]<<16|scanBuf2[i-2]<<8|scanBuf2[i-1])>>>0;
+      if (sz >= 8) { avcCRaw = scanBuf2.slice(i + 4, i - 4 + sz).buffer; break; } // content only (after size+name)
+    }
+  }
 
   // 3. Use our binary parser to get sample positions
   const pVt = parseVideoTrackFull(
@@ -2108,7 +2113,7 @@ async function mp4boxClip(file, clipIn, clipOut, onProgress) {
     name:   'VideoHandler',
     type:   'avc1',
   };
-  if (avcCData) trackOpts.avcDecoderConfigRecord = new Uint8Array(avcCData.buffer);
+  if (avcCRaw) trackOpts.avcDecoderConfigRecord = avcCRaw;
 
   const newTid = outFile.addTrack(trackOpts);
 
