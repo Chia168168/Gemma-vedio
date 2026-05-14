@@ -654,7 +654,7 @@ const miniBar           = document.getElementById('mini-bar');
 const miniPlayIcon      = document.getElementById('mini-play-icon');
 const timeOverlay       = document.getElementById('time-overlay');
 
-let fps = 30;       // will be updated after detection
+let fps = 30;
 let fpsDetected = false;
 let duration = 0;
 let isPlaying = false;
@@ -664,6 +664,23 @@ let frameInterval = null;
 let currentBlobUrl = null;
 let panelVisible = true;
 let autoHideTimer = null;
+
+// Loop range
+let loopIn = null, loopOut = null, loopActive = false;
+const loopRangeOverlay = document.getElementById('loop-range-overlay');
+const loopRangeDisplay = document.getElementById('loop-range-display');
+const loopToggleBtn    = document.getElementById('loop-toggle');
+const loopSetInBtn     = document.getElementById('loop-set-in');
+const loopSetOutBtn    = document.getElementById('loop-set-out');
+
+// Scrub state
+let isScrubbing = false;
+let scrubTargetTime = 0;
+let scrubRaf = null;
+let isSeeking = false;
+
+// Wake lock
+let wakeLock = null;
 
 // ── Utils ──
 function formatTime(s) {
@@ -1331,7 +1348,6 @@ function parseTrakFull(view, start, end) {
   return { timescale, stts, stsc, stco, stsz, stss, ctts, fixedSampleSize, isVideo };
 }
 
-let isSeeking = false;
 
 
 async function mp4boxClip(file, clipIn, clipOut, onProgress) {
