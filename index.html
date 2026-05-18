@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
@@ -8,470 +7,465 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Frame Player">
 <meta name="theme-color" content="#0a0a0c">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
 <title>影片播放器</title>
 <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mp4box@0.5.2/dist/mp4box.all.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Space+Grotesk:wght@300;400;600&display=swap');
 
-- { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
-:root {
-–accent: #c8ff47;
-–accent2: #47d4ff;
-–text: #f0f0f4;
-–muted: #888899;
-}
+  :root {
+    --accent: #c8ff47;
+    --accent2: #47d4ff;
+    --text: #f0f0f4;
+    --muted: #888899;
+  }
 
-html, body {
-background: #000;
-color: var(–text);
-font-family: ‘Space Grotesk’, sans-serif;
-height: 100%;
-overflow: hidden;
-position: fixed;
-width: 100%;
-}
+  html, body {
+    background: #000;
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    height: 100%;
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+  }
 
-/* ══ UPLOAD SCREEN ══ */
-#upload-screen {
-display: flex;
-flex-direction: column;
-align-items: center;
-justify-content: center;
-height: 100dvh;
-gap: 24px;
-padding: 32px;
-background: #0a0a0c;
-}
-.logo {
-font-family: ‘DM Mono’, monospace;
-font-size: 11px;
-letter-spacing: 0.3em;
-color: var(–muted);
-text-transform: uppercase;
-}
-.upload-zone {
-width: 100%; max-width: 340px;
-aspect-ratio: 16/10;
-border: 1.5px dashed rgba(200,255,71,0.3);
-border-radius: 16px;
-display: flex; flex-direction: column;
-align-items: center; justify-content: center;
-gap: 14px;
-background: linear-gradient(135deg, rgba(200,255,71,0.03), rgba(71,212,255,0.03));
-position: relative; overflow: hidden; cursor: pointer;
-transition: border-color 0.2s, background 0.2s;
-}
-.upload-zone:active { border-color: var(–accent); background: rgba(200,255,71,0.07); }
-.upload-zone::before {
-content: ‘’; position: absolute; inset: 0;
-background: radial-gradient(ellipse at 50% 120%, rgba(200,255,71,0.08) 0%, transparent 60%);
-pointer-events: none;
-}
-.upload-icon {
-width: 56px; height: 56px; border-radius: 14px;
-background: rgba(200,255,71,0.1);
-display: flex; align-items: center; justify-content: center;
-}
-.upload-icon svg { width: 28px; height: 28px; stroke: var(–accent); }
-.upload-text { font-size: 15px; font-weight: 600; }
-.upload-sub { font-size: 12px; color: var(–muted); font-family: ‘DM Mono’, monospace; }
-#file-input {
-position: absolute; inset: 0; width: 100%; height: 100%;
-opacity: 0; cursor: pointer; z-index: 10; font-size: 16px;
-}
+  /* ══ UPLOAD SCREEN ══ */
+  #upload-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100dvh;
+    gap: 24px;
+    padding: 32px;
+    background: #0a0a0c;
+  }
+  .logo {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .upload-zone {
+    width: 100%; max-width: 340px;
+    aspect-ratio: 16/10;
+    border: 1.5px dashed rgba(200,255,71,0.3);
+    border-radius: 16px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 14px;
+    background: linear-gradient(135deg, rgba(200,255,71,0.03), rgba(71,212,255,0.03));
+    position: relative; overflow: hidden; cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .upload-zone:active { border-color: var(--accent); background: rgba(200,255,71,0.07); }
+  .upload-zone::before {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 50% 120%, rgba(200,255,71,0.08) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .upload-icon {
+    width: 56px; height: 56px; border-radius: 14px;
+    background: rgba(200,255,71,0.1);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .upload-icon svg { width: 28px; height: 28px; stroke: var(--accent); }
+  .upload-text { font-size: 15px; font-weight: 600; }
+  .upload-sub { font-size: 12px; color: var(--muted); font-family: 'DM Mono', monospace; }
+  #file-input {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    opacity: 0; cursor: pointer; z-index: 10; font-size: 16px;
+  }
 
-/* ══ PLAYER SCREEN — true fullscreen ══ */
-#player-screen {
-display: none;
-position: fixed; inset: 0;
-background: #000;
-}
+  /* ══ PLAYER SCREEN — true fullscreen ══ */
+  #player-screen {
+    display: none;
+    position: fixed; inset: 0;
+    background: #000;
+  }
 
-#video-container {
-position: absolute; inset: 0;
-display: flex; align-items: center; justify-content: center;
-background: #000;
-overflow: hidden;
-touch-action: none;
-}
-#video {
-width: 100%; height: 100%;
-display: block; object-fit: contain;
-transform-origin: center center;
-transition: none;
-will-change: transform;
-}
+  #video-container {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: #000;
+    overflow: hidden;
+    touch-action: none;
+  }
+  #video {
+    width: 100%; height: 100%;
+    display: block; object-fit: contain;
+    transform-origin: center center;
+    transition: none;
+    will-change: transform;
+  }
 
-/* Tap zone over video */
-#tap-overlay {
-position: absolute; inset: 0;
-z-index: 5; cursor: pointer;
-}
+  /* Tap zone over video */
+  #tap-overlay {
+    position: absolute; inset: 0;
+    z-index: 5; cursor: pointer;
+  }
 
-/* ── Time info top-right ── */
-#time-overlay {
-position: absolute;
-top: max(env(safe-area-inset-top, 0px), 8px);
-right: 12px;
-margin-top: 8px;
-background: transparent;
-padding: 5px 10px;
-font-family: ‘DM Mono’, monospace;
-font-size: 11px; color: rgba(255,255,255,0.75);
-letter-spacing: 0.05em;
-pointer-events: none;
-line-height: 1.7; text-align: right;
-z-index: 20;
-transition: opacity 0.3s;
-}
-#time-display { color: rgba(255,255,255,0.85); }
-#frame-display { color: rgba(255,255,255,0.5); font-size: 10px; }
-#time-overlay.hidden { opacity: 0; }
+  /* ── Time info top-right ── */
+  #time-overlay {
+    position: absolute;
+    top: max(env(safe-area-inset-top, 0px), 8px);
+    right: 12px;
+    margin-top: 8px;
+    background: transparent;
+    padding: 5px 10px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px; color: rgba(255,255,255,0.75);
+    letter-spacing: 0.05em;
+    pointer-events: none;
+    line-height: 1.7; text-align: right;
+    z-index: 20;
+    transition: opacity 0.3s;
+  }
+  #time-display { color: rgba(255,255,255,0.85); }
+  #frame-display { color: rgba(255,255,255,0.5); font-size: 10px; }
+  #time-overlay.hidden { opacity: 0; }
 
-/* ── Mini bar (visible when panel hidden) ── */
-#mini-bar {
-position: absolute;
-bottom: max(env(safe-area-inset-bottom, 0px), 10px);
-left: 0; right: 0;
-z-index: 40;
-display: none;
-align-items: center;
-justify-content: space-around;
-background: transparent;
-border: none;
-padding: 6px 24px;
-}
-#mini-bar.show { display: flex; }
+  /* ── Mini bar (visible when panel hidden) ── */
+  #mini-bar {
+    position: absolute;
+    bottom: max(env(safe-area-inset-bottom, 0px), 10px);
+    left: 0; right: 0;
+    z-index: 40;
+    display: none;
+    align-items: center;
+    justify-content: space-around;
+    background: transparent;
+    border: none;
+    padding: 6px 24px;
+  }
+  #mini-bar.show { display: flex; }
 
-.mini-btn {
-background: transparent;
-border: none;
-border-radius: 50%;
-width: 52px; height: 52px;
-display: flex; align-items: center; justify-content: center;
-cursor: pointer;
-flex-shrink: 0;
-opacity: 0.7;
-}
-.mini-btn svg { width: 24px; height: 24px; stroke: #fff; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.mini-btn:active { opacity: 1; transform: scale(0.88); }
+  .mini-btn {
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    width: 52px; height: 52px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    opacity: 0.7;
+  }
+  .mini-btn svg { width: 24px; height: 24px; stroke: #fff; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .mini-btn:active { opacity: 1; transform: scale(0.88); }
 
-#mini-play-btn { opacity: 0.85; }
-#mini-play-btn svg { stroke: #fff; width: 28px; height: 28px; }
+  #mini-play-btn { opacity: 0.85; }
+  #mini-play-btn svg { stroke: #fff; width: 28px; height: 28px; }
 
-.mini-divider { display: none; }
+  .mini-divider { display: none; }
 
-#mini-expand {
-opacity: 0.35;
-font-size: 16px;
-color: #fff;
-padding: 0;
-width: 44px; height: 44px;
-display: flex; align-items: center; justify-content: center;
-background: transparent;
-border: none;
-cursor: pointer;
-line-height: 1;
-flex-shrink: 0;
-}
+  #mini-expand {
+    opacity: 0.35;
+    font-size: 16px;
+    color: #fff;
+    padding: 0;
+    width: 44px; height: 44px;
+    display: flex; align-items: center; justify-content: center;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    line-height: 1;
+    flex-shrink: 0;
+  }
 
-/* ══ FLOATING CONTROLS PANEL ══ */
-#controls {
-position: absolute; left: 0; right: 0; bottom: 0;
-z-index: 30;
-background: transparent;
-padding-top: 32px;
-padding-bottom: max(env(safe-area-inset-bottom, 0px), 6px);
-transition: transform 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.3s;
-}
-#controls.hidden {
-transform: translateY(100%);
-opacity: 0;
-pointer-events: none;
-}
+  /* ══ FLOATING CONTROLS PANEL ══ */
+  #controls {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    z-index: 30;
+    background: transparent;
+    padding-top: 32px;
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 6px);
+    transition: transform 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.3s;
+  }
+  #controls.hidden {
+    transform: translateY(100%);
+    opacity: 0;
+    pointer-events: none;
+  }
 
-/* Hide chevron pill at top of panel */
-#hide-pill {
-display: flex; justify-content: center;
-margin-bottom: 2px;
-}
-#hide-pill button {
-background: transparent;
-border: none; border-radius: 100px;
-padding: 3px 22px; cursor: pointer;
-color: rgba(255,255,255,0.38); font-size: 16px; line-height: 1.3;
-}
+  /* Hide chevron pill at top of panel */
+  #hide-pill {
+    display: flex; justify-content: center;
+    margin-bottom: 2px;
+  }
+  #hide-pill button {
+    background: transparent;
+    border: none; border-radius: 100px;
+    padding: 3px 22px; cursor: pointer;
+    color: rgba(255,255,255,0.38); font-size: 16px; line-height: 1.3;
+  }
 
-/* FPS row */
-#fps-row {
-display: flex; align-items: center;
-padding: 6px 12px 8px;
-border-bottom: none;
-}
-.fps-btns {
-display: flex; gap: 6px; flex: 1;
-overflow-x: auto; -webkit-overflow-scrolling: touch;
-scrollbar-width: none;
-}
-.fps-btns::-webkit-scrollbar { display: none; }
-.fps-btn {
-flex-shrink: 0; padding: 5px 10px;
-border-radius: 100px; border: 1.5px solid rgba(255,255,255,0.25);
-background: transparent; color: rgba(255,255,255,0.75);
-font-family: ‘DM Mono’, monospace; font-size: 13px;
-cursor: pointer; transition: all 0.15s; white-space: nowrap;
-}
-.fps-btn.active {
-background: transparent;
-border-color: var(–accent2);
-color: var(–accent2); font-weight: 500;
-}
-.fps-btn:active { opacity: 0.7; transform: scale(0.95); }
+  /* FPS row */
+  #fps-row {
+    display: flex; align-items: center;
+    padding: 6px 12px 8px;
+    border-bottom: none;
+  }
+  .fps-btns {
+    display: flex; gap: 6px; flex: 1;
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .fps-btns::-webkit-scrollbar { display: none; }
+  .fps-btn {
+    flex-shrink: 0; padding: 5px 10px;
+    border-radius: 100px; border: 1.5px solid rgba(255,255,255,0.25);
+    background: transparent; color: rgba(255,255,255,0.75);
+    font-family: 'DM Mono', monospace; font-size: 13px;
+    cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  }
+  .fps-btn.active {
+    background: transparent;
+    border-color: var(--accent2);
+    color: var(--accent2); font-weight: 500;
+  }
+  .fps-btn:active { opacity: 0.7; transform: scale(0.95); }
 
-/* Speed row */
-#speed-row {
-display: flex; align-items: center;
-padding: 6px 12px 8px;
-border-bottom: none;
-}
-.speed-label {
-font-size: 11px; font-family: ‘DM Mono’, monospace;
-color: rgba(255,255,255,0.5); letter-spacing: 0.2em;
-text-transform: uppercase; margin-right: 10px; white-space: nowrap;
-}
-.speed-btns {
-display: flex; gap: 6px; flex: 1;
-overflow-x: auto; -webkit-overflow-scrolling: touch;
-scrollbar-width: none;
-}
-.speed-btns::-webkit-scrollbar { display: none; }
-.speed-btn {
-flex-shrink: 0; padding: 5px 11px;
-border-radius: 100px; border: 1.5px solid rgba(255,255,255,0.25);
-background: transparent; color: rgba(255,255,255,0.75);
-font-family: ‘DM Mono’, monospace; font-size: 13px;
-cursor: pointer; transition: all 0.15s; white-space: nowrap;
-}
-.speed-btn.active {
-background: transparent; border-color: var(–accent);
-color: var(–accent); font-weight: 500;
-}
-.speed-btn:active { opacity: 0.7; transform: scale(0.95); }
+  /* Speed row */
+  #speed-row {
+    display: flex; align-items: center;
+    padding: 6px 12px 8px;
+    border-bottom: none;
+  }
+  .speed-label {
+    font-size: 11px; font-family: 'DM Mono', monospace;
+    color: rgba(255,255,255,0.5); letter-spacing: 0.2em;
+    text-transform: uppercase; margin-right: 10px; white-space: nowrap;
+  }
+  .speed-btns {
+    display: flex; gap: 6px; flex: 1;
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .speed-btns::-webkit-scrollbar { display: none; }
+  .speed-btn {
+    flex-shrink: 0; padding: 5px 11px;
+    border-radius: 100px; border: 1.5px solid rgba(255,255,255,0.25);
+    background: transparent; color: rgba(255,255,255,0.75);
+    font-family: 'DM Mono', monospace; font-size: 13px;
+    cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  }
+  .speed-btn.active {
+    background: transparent; border-color: var(--accent);
+    color: var(--accent); font-weight: 500;
+  }
+  .speed-btn:active { opacity: 0.7; transform: scale(0.95); }
 
-/* Playback row */
-#playback-row {
-display: flex; align-items: center; justify-content: center;
-gap: 8px; padding: 10px 12px;
-border-bottom: none;
-}
-.ctrl-btn {
-display: flex; flex-direction: column;
-align-items: center; justify-content: center;
-gap: 3px;
-background: transparent;
-border: none;
-border-radius: 12px; padding: 10px 12px;
-cursor: pointer; transition: all 0.15s;
-flex: 1; max-width: 72px; min-height: 54px;
-}
-.ctrl-btn svg { width: 22px; height: 22px; stroke: rgba(255,255,255,0.85); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.ctrl-btn span { font-size: 11px; font-family: ‘DM Mono’, monospace; color: rgba(255,255,255,0.6); letter-spacing: 0.05em; }
-.ctrl-btn:active { opacity: 0.6; transform: scale(0.95); }
+  /* Playback row */
+  #playback-row {
+    display: flex; align-items: center; justify-content: center;
+    gap: 8px; padding: 10px 12px;
+    border-bottom: none;
+  }
+  .ctrl-btn {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 3px;
+    background: transparent;
+    border: none;
+    border-radius: 12px; padding: 10px 12px;
+    cursor: pointer; transition: all 0.15s;
+    flex: 1; max-width: 72px; min-height: 54px;
+  }
+  .ctrl-btn svg { width: 22px; height: 22px; stroke: rgba(255,255,255,0.85); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .ctrl-btn span { font-size: 11px; font-family: 'DM Mono', monospace; color: rgba(255,255,255,0.6); letter-spacing: 0.05em; }
+  .ctrl-btn:active { opacity: 0.6; transform: scale(0.95); }
 
-#play-btn {
-background: transparent; border: none;
-max-width: 80px; min-height: 60px;
-}
-#play-btn svg { stroke: #fff; width: 28px; height: 28px; }
-#play-btn span { color: rgba(255,255,255,0.6); font-size: 11px; }
-#play-btn:active { opacity: 0.7; transform: scale(0.95); }
+  #play-btn {
+    background: transparent; border: none;
+    max-width: 80px; min-height: 60px;
+  }
+  #play-btn svg { stroke: #fff; width: 28px; height: 28px; }
+  #play-btn span { color: rgba(255,255,255,0.6); font-size: 11px; }
+  #play-btn:active { opacity: 0.7; transform: scale(0.95); }
 
-.save-btn svg { stroke: rgba(255,255,255,0.85); }
+  .save-btn svg { stroke: rgba(255,255,255,0.85); }
 
-/* Timeline */
-#timeline-section {
-padding: 8px 12px 10px;
-display: flex; flex-direction: column; gap: 6px;
-}
-.timeline-label {
-font-size: 10px; font-family: ‘DM Mono’, monospace;
-color: var(–muted); letter-spacing: 0.15em; text-transform: uppercase;
-display: flex; justify-content: space-between;
-}
-#progress-bar-wrap {
-position: relative; height: 4px;
-background: rgba(255,255,255,0.12);
-border-radius: 2px; cursor: pointer;
-}
-#progress-fill {
-height: 100%; background: var(–accent);
-border-radius: 2px; width: 0%;
-transition: width 0.08s linear;
-}
-#thumbnail-strip {
-position: relative; height: 50px;
-border-radius: 8px; overflow: hidden;
-background: rgba(255,255,255,0.05);
-border: 1px solid rgba(255,255,255,0.08);
-cursor: pointer;
-}
-#thumb-canvas-strip {
-display: flex; height: 100%; width: 100%;
-position: absolute; top: 0; left: 0;
-}
-#thumb-canvas-strip canvas { flex-shrink: 0; height: 100%; object-fit: cover; }
-#timeline-indicator {
-position: absolute; top: 0; width: 2px; height: 100%;
-background: var(–accent); pointer-events: none;
-box-shadow: 0 0 6px var(–accent); z-index: 10;
-}
-#timeline-indicator::before {
-content: ‘’; position: absolute; top: -4px; left: 50%;
-transform: translateX(-50%);
-width: 10px; height: 10px;
-background: var(–accent); border-radius: 50%;
-}
-.thumb-loading {
-color: var(–muted); font-size: 11px;
-font-family: ‘DM Mono’, monospace; text-align: center; padding: 8px 0 0;
-}
+  /* Timeline */
+  #timeline-section {
+    padding: 8px 12px 10px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .timeline-label {
+    font-size: 10px; font-family: 'DM Mono', monospace;
+    color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase;
+    display: flex; justify-content: space-between;
+  }
+  #progress-bar-wrap {
+    position: relative; height: 4px;
+    background: rgba(255,255,255,0.12);
+    border-radius: 2px; cursor: pointer;
+  }
+  #progress-fill {
+    height: 100%; background: var(--accent);
+    border-radius: 2px; width: 0%;
+    transition: width 0.08s linear;
+  }
+  #thumbnail-strip {
+    position: relative; height: 50px;
+    border-radius: 8px; overflow: hidden;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    cursor: pointer;
+  }
+  #thumb-canvas-strip {
+    display: flex; height: 100%; width: 100%;
+    position: absolute; top: 0; left: 0;
+  }
+  #thumb-canvas-strip canvas { flex-shrink: 0; height: 100%; object-fit: cover; }
+  #timeline-indicator {
+    position: absolute; top: 0; width: 2px; height: 100%;
+    background: var(--accent); pointer-events: none;
+    box-shadow: 0 0 6px var(--accent); z-index: 10;
+  }
+  #timeline-indicator::before {
+    content: ''; position: absolute; top: -4px; left: 50%;
+    transform: translateX(-50%);
+    width: 10px; height: 10px;
+    background: var(--accent); border-radius: 50%;
+  }
+  .thumb-loading {
+    color: var(--muted); font-size: 11px;
+    font-family: 'DM Mono', monospace; text-align: center; padding: 8px 0 0;
+  }
 
-/* Loop range */
-#loop-row {
-display: flex; align-items: center; gap: 8px;
-padding: 4px 12px 8px;
-}
-#loop-toggle {
-background: transparent; border: 1.5px solid rgba(255,255,255,0.2);
-border-radius: 100px; padding: 5px 12px;
-color: rgba(255,255,255,0.5); font-family: ‘DM Mono’, monospace;
-font-size: 12px; cursor: pointer; white-space: nowrap; flex-shrink: 0;
-transition: all 0.15s;
-}
-#loop-toggle.active {
-border-color: var(–accent2); color: var(–accent2);
-}
-#loop-set-in, #loop-set-out {
-background: transparent; border: 1.5px solid rgba(255,255,255,0.2);
-border-radius: 100px; padding: 5px 10px;
-color: rgba(255,255,255,0.5); font-family: ‘DM Mono’, monospace;
-font-size: 12px; cursor: pointer; white-space: nowrap; flex-shrink: 0;
-transition: all 0.15s;
-}
-#loop-set-in.set { border-color: rgba(200,255,71,0.5); color: var(–accent); }
-#loop-set-out.set { border-color: rgba(200,255,71,0.5); color: var(–accent); }
-#loop-set-in:active, #loop-set-out:active, #loop-toggle:active, #loop-clear:active { opacity: 0.6; }
+  /* Loop range */
+  #loop-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 12px 8px;
+  }
+  #loop-toggle {
+    background: transparent; border: 1.5px solid rgba(255,255,255,0.2);
+    border-radius: 100px; padding: 5px 12px;
+    color: rgba(255,255,255,0.5); font-family: 'DM Mono', monospace;
+    font-size: 12px; cursor: pointer; white-space: nowrap; flex-shrink: 0;
+    transition: all 0.15s;
+  }
+  #loop-toggle.active {
+    border-color: var(--accent2); color: var(--accent2);
+  }
+  #loop-set-in, #loop-set-out {
+    background: transparent; border: 1.5px solid rgba(255,255,255,0.2);
+    border-radius: 100px; padding: 5px 10px;
+    color: rgba(255,255,255,0.5); font-family: 'DM Mono', monospace;
+    font-size: 12px; cursor: pointer; white-space: nowrap; flex-shrink: 0;
+    transition: all 0.15s;
+  }
+  #loop-set-in.set { border-color: rgba(200,255,71,0.5); color: var(--accent); }
+  #loop-set-out.set { border-color: rgba(200,255,71,0.5); color: var(--accent); }
+  #loop-set-in:active, #loop-set-out:active, #loop-toggle:active, #loop-clear:active { opacity: 0.6; }
 
-#loop-clear {
-background: transparent; border: 1.5px solid rgba(255,255,255,0.2);
-border-radius: 100px; padding: 5px 10px;
-color: rgba(255,255,255,0.4); font-family: ‘DM Mono’, monospace;
-font-size: 12px; cursor: pointer; white-space: nowrap; flex-shrink: 0;
-transition: all 0.15s;
-}
+  #loop-clear {
+    background: transparent; border: 1.5px solid rgba(255,255,255,0.2);
+    border-radius: 100px; padding: 5px 10px;
+    color: rgba(255,255,255,0.4); font-family: 'DM Mono', monospace;
+    font-size: 12px; cursor: pointer; white-space: nowrap; flex-shrink: 0;
+    transition: all 0.15s;
+  }
 
-#loop-export {
-background: transparent; border: 1.5px solid rgba(200,255,71,0.3);
-border-radius: 100px; padding: 5px 11px;
-color: var(–accent); font-family: ‘DM Mono’, monospace;
-font-size: 12px; cursor: pointer; white-space: nowrap; flex-shrink: 0;
-transition: all 0.15s;
-}
-#loop-export:active { opacity: 0.6; }
-#loop-export:disabled { opacity: 0.3; cursor: not-allowed; }
+  #loop-export {
+    background: transparent; border: 1.5px solid rgba(200,255,71,0.3);
+    border-radius: 100px; padding: 5px 11px;
+    color: var(--accent); font-family: 'DM Mono', monospace;
+    font-size: 12px; cursor: pointer; white-space: nowrap; flex-shrink: 0;
+    transition: all 0.15s;
+  }
+  #loop-export:active { opacity: 0.6; }
+  #loop-export:disabled { opacity: 0.3; cursor: not-allowed; }
 
-#loop-convert {
-background: transparent; border: 1.5px solid rgba(71,212,255,0.3);
-border-radius: 100px; padding: 5px 11px;
-color: var(–accent2); font-family: ‘DM Mono’, monospace;
-font-size: 12px; cursor: pointer; white-space: nowrap; flex-shrink: 0;
-transition: all 0.15s;
-}
-#loop-convert:active { opacity: 0.6; }
+  #loop-convert {
+    background: transparent; border: 1.5px solid rgba(71,212,255,0.3);
+    border-radius: 100px; padding: 5px 11px;
+    color: var(--accent2); font-family: 'DM Mono', monospace;
+    font-size: 12px; cursor: pointer; white-space: nowrap; flex-shrink: 0;
+    transition: all 0.15s;
+  }
+  #loop-convert:active { opacity: 0.6; }
 
-#export-format {
-background: transparent; border: 1.5px solid rgba(255,255,255,0.2);
-border-radius: 100px; padding: 5px 8px;
-color: rgba(255,255,255,0.6); font-family: ‘DM Mono’, monospace;
-font-size: 12px; cursor: pointer; flex-shrink: 0;
--webkit-appearance: none; appearance: none;
-text-align: center;
-}
-#export-format option { background: #1a1a1a; color: #fff; }
+  #export-format {
+    background: transparent; border: 1.5px solid rgba(255,255,255,0.2);
+    border-radius: 100px; padding: 5px 8px;
+    color: rgba(255,255,255,0.6); font-family: 'DM Mono', monospace;
+    font-size: 12px; cursor: pointer; flex-shrink: 0;
+    -webkit-appearance: none; appearance: none;
+    text-align: center;
+  }
+  #export-format option { background: #1a1a1a; color: #fff; }
 
-/* Export progress overlay */
-#export-overlay {
-display: none;
-position: fixed; inset: 0; z-index: 99999;
-background: rgba(0,0,0,0.85);
-flex-direction: column; align-items: center; justify-content: center;
-gap: 16px;
-}
-#export-overlay.show { display: flex; }
-#export-overlay p {
-color: #fff; font-family: ‘DM Mono’, monospace;
-font-size: 14px; text-align: center; line-height: 1.6;
-padding: 0 24px;
-}
-#export-progress-bar {
-width: 240px; height: 6px;
-background: rgba(255,255,255,0.15); border-radius: 3px; overflow: hidden;
-}
-#export-progress-fill {
-height: 100%; background: var(–accent);
-border-radius: 3px; width: 0%;
-transition: width 0.3s;
-}
-#export-cancel {
-background: transparent; border: 1.5px solid rgba(255,255,255,0.25);
-border-radius: 100px; padding: 7px 20px;
-color: rgba(255,255,255,0.6); font-family: ‘DM Mono’, monospace;
-font-size: 13px; cursor: pointer;
-}
+  /* Export progress overlay */
+  #export-overlay {
+    display: none;
+    position: fixed; inset: 0; z-index: 99999;
+    background: rgba(0,0,0,0.85);
+    flex-direction: column; align-items: center; justify-content: center;
+    gap: 16px;
+  }
+  #export-overlay.show { display: flex; }
+  #export-overlay p {
+    color: #fff; font-family: 'DM Mono', monospace;
+    font-size: 14px; text-align: center; line-height: 1.6;
+    padding: 0 24px;
+  }
+  #export-progress-bar {
+    width: 240px; height: 6px;
+    background: rgba(255,255,255,0.15); border-radius: 3px; overflow: hidden;
+  }
+  #export-progress-fill {
+    height: 100%; background: var(--accent);
+    border-radius: 3px; width: 0%;
+    transition: width 0.3s;
+  }
+  #export-cancel {
+    background: transparent; border: 1.5px solid rgba(255,255,255,0.25);
+    border-radius: 100px; padding: 7px 20px;
+    color: rgba(255,255,255,0.6); font-family: 'DM Mono', monospace;
+    font-size: 13px; cursor: pointer;
+  }
 
-#loop-range-display {
-flex: 1; font-family: ‘DM Mono’, monospace; font-size: 10px;
-color: rgba(255,255,255,0.35); text-align: right; white-space: nowrap;
-overflow: hidden; text-overflow: ellipsis;
-}
+  #loop-range-display {
+    flex: 1; font-family: 'DM Mono', monospace; font-size: 10px;
+    color: rgba(255,255,255,0.35); text-align: left; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+  }
 
-/* Range overlay on thumbnail strip */
-#loop-range-overlay {
-position: absolute; top: 0; height: 100%;
-background: rgba(200,255,71,0.15);
-border-left: 2px solid var(–accent);
-border-right: 2px solid var(–accent);
-pointer-events: none; z-index: 8;
-display: none;
-}
-#loop-range-overlay.show { display: block; }
+  /* Range overlay on thumbnail strip */
+  #loop-range-overlay {
+    position: absolute; top: 0; height: 100%;
+    background: rgba(200,255,71,0.15);
+    border-left: 2px solid var(--accent);
+    border-right: 2px solid var(--accent);
+    pointer-events: none; z-index: 8;
+    display: none;
+  }
+  #loop-range-overlay.show { display: block; }
 
-/* Toast */
-#toast {
-position: fixed; bottom: 50px; left: 50%;
-transform: translateX(-50%) translateY(14px);
-background: rgba(15,15,22,0.92);
-backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-border: 1px solid rgba(255,255,255,0.1);
-color: var(–text); padding: 9px 18px;
-border-radius: 100px; font-size: 13px;
-font-family: ‘DM Mono’, monospace;
-opacity: 0; pointer-events: none;
-transition: all 0.25s; z-index: 9999; white-space: nowrap;
-}
-#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  /* Toast */
+  #toast {
+    position: fixed; bottom: 50px; left: 50%;
+    transform: translateX(-50%) translateY(14px);
+    background: rgba(15,15,22,0.92);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: var(--text); padding: 9px 18px;
+    border-radius: 100px; font-size: 13px;
+    font-family: 'DM Mono', monospace;
+    opacity: 0; pointer-events: none;
+    transition: all 0.25s; z-index: 9999; white-space: nowrap;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 </style>
-
 </head>
 <body>
 
 <!-- Upload -->
-
 <div id="upload-screen">
   <div class="logo">Video Frame Player</div>
   <div class="upload-zone">
@@ -487,7 +481,6 @@ transition: all 0.25s; z-index: 9999; white-space: nowrap;
 </div>
 
 <!-- Player -->
-
 <div id="player-screen">
   <div id="video-container">
     <video id="video" playsinline webkit-playsinline></video>
@@ -501,7 +494,6 @@ transition: all 0.25s; z-index: 9999; white-space: nowrap;
   </div>
 
   <!-- Mini bar (when panel hidden) -->
-
   <div id="mini-bar">
     <button class="mini-btn" id="mini-back5">
       <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.47"/><text x="12" y="14.5" text-anchor="middle" font-size="6" fill="white" stroke="none" font-family="monospace">5</text></svg>
@@ -527,101 +519,96 @@ transition: all 0.25s; z-index: 9999; white-space: nowrap;
   </div>
 
   <!-- Floating controls -->
-
   <div id="controls">
     <div id="hide-pill"><button>︾</button></div>
 
-```
-<div id="speed-row">
-  <div class="speed-label">速度</div>
-  <div class="speed-btns">
-    <button class="speed-btn" data-speed="0.1">× 0.1</button>
-    <button class="speed-btn" data-speed="0.5">× 0.5</button>
-    <button class="speed-btn active" data-speed="1">× 1</button>
-    <button class="speed-btn" data-speed="2">× 2</button>
-    <button class="speed-btn" data-speed="frame">1 Frame/s</button>
-  </div>
-  <button id="change-video-btn" style="
-    flex-shrink:0;margin-left:8px;padding:5px 11px;
-    border-radius:100px;border:1.5px solid rgba(255,255,255,0.2);
-    background:transparent;color:rgba(255,255,255,0.5);
-    font-family:'DM Mono',monospace;font-size:12px;cursor:pointer;white-space:nowrap;
-  ">換片</button>
-</div>
+    <div id="speed-row">
+      <div class="speed-label">速度</div>
+      <div class="speed-btns">
+        <button class="speed-btn" data-speed="0.1">0.1</button>
+        <button class="speed-btn" data-speed="0.5">0.5</button>
+        <button class="speed-btn active" data-speed="1">1</button>
+        <button class="speed-btn" data-speed="2">2</button>
+        <button class="speed-btn" data-speed="frame">Frame</button>
+      </div>
+      <button id="change-video-btn" style="
+        flex-shrink:0;margin-left:8px;padding:5px 11px;
+        border-radius:100px;border:1.5px solid rgba(255,255,255,0.2);
+        background:transparent;color:rgba(255,255,255,0.5);
+        font-family:'DM Mono',monospace;font-size:12px;cursor:pointer;white-space:nowrap;
+      ">換片</button>
+    </div>
 
-<div id="fps-row">
-  <div class="speed-label">FPS</div>
-  <div class="fps-btns">
-    <button class="fps-btn" data-fps="23.976">23.97</button>
-    <button class="fps-btn" data-fps="24">24</button>
-    <button class="fps-btn" data-fps="25">25</button>
-    <button class="fps-btn" data-fps="29.97">29.97</button>
-    <button class="fps-btn active" data-fps="30">30</button>
-    <button class="fps-btn" data-fps="50">50</button>
-    <button class="fps-btn" data-fps="59.94">59.94</button>
-    <button class="fps-btn" data-fps="60">60</button>
-    <button class="fps-btn" data-fps="120">120</button>
-    <button class="fps-btn" data-fps="240">240</button>
-  </div>
-</div>
+    <div id="fps-row">
+      <div class="speed-label">FPS</div>
+      <div class="fps-btns">
+        <button class="fps-btn" data-fps="23.976">23.97</button>
+        <button class="fps-btn" data-fps="24">24</button>
+        <button class="fps-btn" data-fps="25">25</button>
+        <button class="fps-btn" data-fps="29.97">29.97</button>
+        <button class="fps-btn active" data-fps="30">30</button>
+        <button class="fps-btn" data-fps="50">50</button>
+        <button class="fps-btn" data-fps="59.94">59.94</button>
+        <button class="fps-btn" data-fps="60">60</button>
+        <button class="fps-btn" data-fps="120">120</button>
+        <button class="fps-btn" data-fps="240">240</button>
+      </div>
+    </div>
 
-<div id="playback-row">
-  <button class="ctrl-btn" id="back5-btn">
-    <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.47"/><text x="12" y="14.5" text-anchor="middle" font-size="6" fill="white" stroke="none" font-family="monospace">5</text></svg>
-    <span>-5s</span>
-  </button>
-  <button class="ctrl-btn" id="prev-frame-btn">
-    <svg viewBox="0 0 24 24"><polygon points="11 19 2 12 11 5 11 19"/><line x1="22" y1="19" x2="22" y2="5"/></svg>
-    <span>上格</span>
-  </button>
-  <button class="ctrl-btn" id="play-btn">
-    <svg id="play-icon" viewBox="0 0 24 24"><polygon fill="#0a0a0c" stroke="#0a0a0c" points="5 3 19 12 5 21 5 3"/></svg>
-    <span id="play-label">播放</span>
-  </button>
-  <button class="ctrl-btn" id="next-frame-btn">
-    <svg viewBox="0 0 24 24"><polygon points="13 19 22 12 13 5 13 19"/><line x1="2" y1="19" x2="2" y2="5"/></svg>
-    <span>下格</span>
-  </button>
-  <button class="ctrl-btn" id="fwd5-btn">
-    <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-3.47"/><text x="12" y="14.5" text-anchor="middle" font-size="6" fill="white" stroke="none" font-family="monospace">5</text></svg>
-    <span>+5s</span>
-  </button>
-  <button class="ctrl-btn save-btn" id="save-btn">
-    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="13" r="3"/><rect x="8" y="3" width="8" height="4" rx="1"/></svg>
-    <span>截圖</span>
-  </button>
-</div>
+    <div id="playback-row">
+      <button class="ctrl-btn" id="back5-btn">
+        <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.47"/><text x="12" y="14.5" text-anchor="middle" font-size="6" fill="white" stroke="none" font-family="monospace">5</text></svg>
+        <span>-5s</span>
+      </button>
+      <button class="ctrl-btn" id="prev-frame-btn">
+        <svg viewBox="0 0 24 24"><polygon points="11 19 2 12 11 5 11 19"/><line x1="22" y1="19" x2="22" y2="5"/></svg>
+        <span>上格</span>
+      </button>
+      <button class="ctrl-btn" id="play-btn">
+        <svg id="play-icon" viewBox="0 0 24 24"><polygon fill="#0a0a0c" stroke="#0a0a0c" points="5 3 19 12 5 21 5 3"/></svg>
+        <span id="play-label">播放</span>
+      </button>
+      <button class="ctrl-btn" id="next-frame-btn">
+        <svg viewBox="0 0 24 24"><polygon points="13 19 22 12 13 5 13 19"/><line x1="2" y1="19" x2="2" y2="5"/></svg>
+        <span>下格</span>
+      </button>
+      <button class="ctrl-btn" id="fwd5-btn">
+        <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-3.47"/><text x="12" y="14.5" text-anchor="middle" font-size="6" fill="white" stroke="none" font-family="monospace">5</text></svg>
+        <span>+5s</span>
+      </button>
+      <button class="ctrl-btn save-btn" id="save-btn">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="13" r="3"/><rect x="8" y="3" width="8" height="4" rx="1"/></svg>
+        <span>截圖</span>
+      </button>
+    </div>
 
-<div id="timeline-section">
-  <div class="timeline-label">
-    <span>時間軸</span>
-    <span id="total-time-label">—</span>
-  </div>
-  <div id="progress-bar-wrap"><div id="progress-fill"></div></div>
-  <div id="thumbnail-strip">
-    <div id="thumb-canvas-strip"></div>
-    <div id="loop-range-overlay"></div>
-    <div id="timeline-indicator"></div>
-  </div>
-  <div id="thumb-status" class="thumb-loading">生成縮圖中…</div>
-</div>
+    <div id="timeline-section">
+      <div class="timeline-label">
+        <span id="loop-range-display">—</span>
+        <span id="total-time-label">—</span>
+      </div>
+      <div id="progress-bar-wrap"><div id="progress-fill"></div></div>
+      <div id="thumbnail-strip">
+        <div id="thumb-canvas-strip"></div>
+        <div id="loop-range-overlay"></div>
+        <div id="timeline-indicator"></div>
+      </div>
+      <div id="thumb-status" class="thumb-loading">生成縮圖中…</div>
+    </div>
 
-<div id="loop-row">
-  <button id="loop-set-in">IN</button>
-  <button id="loop-set-out">OUT</button>
-  <button id="loop-clear">✕</button>
-  <button id="loop-toggle">⟲ 循環</button>
-  <select id="export-format">
-    <option value="original">原格式</option>
-    <option value="mp4">MP4</option>
-    <option value="mov">MOV</option>
-  </select>
-  <button id="loop-export">✂ 剪輯</button>
-  <button id="loop-convert">⇄ 轉檔</button>
-  <div id="loop-range-display">—</div>
-</div>
-```
-
+    <div id="loop-row">
+      <button id="loop-set-in">IN</button>
+      <button id="loop-set-out">OUT</button>
+      <button id="loop-clear">✕</button>
+      <button id="loop-toggle">⟲</button>
+      <select id="export-format">
+        <option value="original">原格式</option>
+        <option value="mp4">MP4</option>
+        <option value="mov">MOV</option>
+      </select>
+      <button id="loop-export">✂</button>
+      <button id="loop-convert">⇄</button>
+    </div>
   </div>
 </div>
 
@@ -645,7 +632,6 @@ const playLabel         = document.getElementById('play-label');
 const timeDisplay       = document.getElementById('time-display');
 const frameDisplay      = document.getElementById('frame-display');
 const progressFill      = document.getElementById('progress-fill');
-const progressWrap      = document.getElementById('progress-bar-wrap');
 const timelineIndicator = document.getElementById('timeline-indicator');
 const thumbnailStrip    = document.getElementById('thumbnail-strip');
 const thumbCanvasStrip  = document.getElementById('thumb-canvas-strip');
@@ -657,7 +643,7 @@ const miniBar           = document.getElementById('mini-bar');
 const miniPlayIcon      = document.getElementById('mini-play-icon');
 const timeOverlay       = document.getElementById('time-overlay');
 
-let fps = 30;
+let fps = 30;       // will be updated after detection
 let fpsDetected = false;
 let duration = 0;
 let isPlaying = false;
@@ -668,34 +654,17 @@ let currentBlobUrl = null;
 let panelVisible = true;
 let autoHideTimer = null;
 
-// Loop range
-let loopIn = null, loopOut = null, loopActive = false;
-const loopRangeOverlay = document.getElementById('loop-range-overlay');
-const loopRangeDisplay = document.getElementById('loop-range-display');
-const loopToggleBtn    = document.getElementById('loop-toggle');
-const loopSetInBtn     = document.getElementById('loop-set-in');
-const loopSetOutBtn    = document.getElementById('loop-set-out');
-
-// Scrub state
-let isScrubbing = false;
-let scrubTargetTime = 0;
-let scrubRaf = null;
-let isSeeking = false;
-
-// Wake lock
-let wakeLock = null;
-
 // ── Utils ──
 function formatTime(s) {
   const m = Math.floor(s / 60);
   const sec = (s % 60).toFixed(3);
   return `${String(m).padStart(2,'0')}:${sec.padStart(6,'0')}`;
 }
-function showToast(msg, duration_ms) {
+function showToast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), duration_ms || 2200);
+  setTimeout(() => t.classList.remove('show'), 2200);
 }
 function updateUI() {
   const ct = video.currentTime;
@@ -862,7 +831,6 @@ changeInput.style.display = 'none';
 document.body.appendChild(changeInput);
 
 fileInput.addEventListener('change', e => {
-  alert('fileInput change 觸發');
   const f = e.target.files && e.target.files[0];
   if (!f) return;
   fileInput.value = '';
@@ -1152,1785 +1120,902 @@ function snapToCommonFPS(raw) {
 
 function readFileSlice(file, start, end) {
   return new Promise((resolve, reject) => {
-    if (start >= end) { resolve(new ArrayBuffer(0)); return; }
     const r = new FileReader();
     r.onload = e => resolve(e.target.result);
-    r.onerror = e => reject(new Error('FileReader 錯誤：' + (r.error?.message || '讀取失敗')));
+    r.onerror = reject;
     r.readAsArrayBuffer(file.slice(start, end));
   });
 }
 
-// ── Byte-range extraction: only read the bytes needed for the clip ──
-async function extractClipBlob(file, clipIn, clipOut) {
+function seekExact(t) {
+  return new Promise(resolve => {
+    const clamped = Math.max(0, Math.min(duration - 0.001, t));
+    if (Math.abs(video.currentTime - clamped) < 0.0001) { resolve(); return; }
+    const done = () => { video.removeEventListener('seeked', done); resolve(); };
+    video.addEventListener('seeked', done);
+    video.currentTime = clamped;
+  });
+}
+
+// ── Thumbnails ──
+async function generateThumbnails() {
+  thumbCanvasStrip.innerHTML = '';
+  thumbStatus.style.display = 'block';
+  thumbStatus.textContent = '生成縮圖中…';
+  await new Promise(r => setTimeout(r, 100));
+
+  if (!video.videoWidth || !video.duration) {
+    thumbStatus.style.display = 'none'; return;
+  }
+
+  const W = thumbnailStrip.offsetWidth || 320;
+  const H = thumbnailStrip.offsetHeight || 50;
+  const vw = video.videoWidth || 16;
+  const vh = video.videoHeight || 9;
+  const aspect = vw / vh;
+  const tw = Math.round(H * aspect);
+  const count = Math.max(6, Math.round(W / tw));
+
+  for (let i = 0; i < count; i++) {
+    try {
+      await seekExact((i / count) * duration);
+      const c = document.createElement('canvas');
+      c.width = tw; c.height = H;
+      c.getContext('2d').drawImage(video, 0, 0, tw, H);
+      c.style.cssText = `width:${tw}px;height:${H}px;flex-shrink:0;`;
+      thumbCanvasStrip.appendChild(c);
+    } catch(e) {
+      // Skip this frame if seek fails
+    }
+  }
+
+  thumbStatus.style.display = 'none';
+  try { await seekExact(0); } catch(e) {}
+  updateUI();
+}
+
+// ── Play / Pause ──
+function setPlayIcon(on) {
+  if (on) {
+    playIcon.innerHTML = '<rect x="6" y="4" width="4" height="16" fill="#fff" stroke="#fff"/><rect x="14" y="4" width="4" height="16" fill="#fff" stroke="#fff"/>';
+    playLabel.textContent = '暫停';
+  } else {
+    playIcon.innerHTML = '<polygon fill="#fff" stroke="#fff" points="5 3 19 12 5 21 5 3"/>';
+    playLabel.textContent = '播放';
+  }
+  syncMiniPlayIcon(on);
+}
+
+playBtn.addEventListener('click', e => { e.stopPropagation(); togglePlay(); });
+
+function togglePlay() {
+  if (frameMode) { toggleFrameMode(); hidePanel(); return; }
+  if (currentSpeed === 'frame') { toggleFrameMode(); hidePanel(); return; }
+  if (video.paused) {
+    video.play(); isPlaying = true; setPlayIcon(true); hidePanel();
+  } else {
+    video.pause(); isPlaying = false; setPlayIcon(false); clearTimeout(autoHideTimer);
+  }
+}
+
+// ── Frame mode ──
+function stopFrameMode() {
+  if (frameInterval) { clearInterval(frameInterval); frameInterval = null; }
+  frameMode = false;
+}
+function toggleFrameMode() {
+  if (frameMode) { stopFrameMode(); setPlayIcon(false); return; }
+  video.pause(); isPlaying = false;
+  frameMode = true; setPlayIcon(true);
+  const spf = 1 / fps;
+  frameInterval = setInterval(() => {
+    if (!frameMode) return;
+    const next = video.currentTime + spf;
+    if (next >= duration) { stopFrameMode(); setPlayIcon(false); return; }
+    const done = () => { video.removeEventListener('seeked', done); updateUI(); };
+    video.addEventListener('seeked', done);
+    video.currentTime = next;
+  }, 1000);
+}
+
+video.addEventListener('timeupdate', updateUI);
+video.addEventListener('ended', () => {
+  isPlaying = false; setPlayIcon(false); stopFrameMode(); clearTimeout(autoHideTimer);
+});
+
+// ── Speed buttons ──
+document.querySelectorAll('.speed-btn').forEach(btn => {
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    stopFrameMode();
+    const s = btn.dataset.speed;
+    if (s === 'frame') {
+      video.pause(); isPlaying = false; currentSpeed = 'frame'; video.playbackRate = 1;
+      toggleFrameMode();
+    } else {
+      currentSpeed = parseFloat(s);
+      video.playbackRate = currentSpeed;
+      if (!video.paused) setPlayIcon(true);
+    }
+    resetAutoHide();
+  });
+});
+
+// ── ±5s ──
+document.getElementById('back5-btn').addEventListener('click', e => {
+  e.stopPropagation();
+  stopFrameMode(); video.currentTime = Math.max(0, video.currentTime - 5);
+  updateUI(); resetAutoHide();
+});
+document.getElementById('fwd5-btn').addEventListener('click', e => {
+  e.stopPropagation();
+  stopFrameMode(); video.currentTime = Math.min(duration, video.currentTime + 5);
+  updateUI(); resetAutoHide();
+});
+
+// ── Prev / Next frame with long-press ──
+function stepFrame(dir) {
+  stopFrameMode();
+  video.pause(); isPlaying = false; setPlayIcon(false);
+  video.currentTime = Math.max(0, Math.min(duration, video.currentTime + dir / fps));
+  updateUI();
+}
+function setupLongPress(el, dir) {
+  let pt = null, rt = null;
+  function start(e) {
+    e.preventDefault(); e.stopPropagation();
+    stepFrame(dir);
+    pt = setTimeout(() => { rt = setInterval(() => stepFrame(dir), 80); }, 380);
+  }
+  function stop() { clearTimeout(pt); clearInterval(rt); pt = null; rt = null; }
+  el.addEventListener('touchstart', start, { passive: false });
+  el.addEventListener('touchend', stop);
+  el.addEventListener('touchcancel', stop);
+  el.addEventListener('mousedown', start);
+  el.addEventListener('mouseup', stop);
+  el.addEventListener('mouseleave', stop);
+}
+setupLongPress(document.getElementById('prev-frame-btn'), -1);
+setupLongPress(document.getElementById('next-frame-btn'), +1);
+// Wire mini frame buttons with same long-press
+setupLongPress(document.getElementById('mini-prev'), -1);
+setupLongPress(document.getElementById('mini-next'), +1);
+
+// ── Timeline scrub ──
+let isScrubbing = false;
+function scrubAt(cx) {
+  const r = thumbnailStrip.getBoundingClientRect();
+  video.currentTime = Math.max(0, Math.min(1, (cx - r.left) / r.width)) * duration;
+  updateUI();
+}
+thumbnailStrip.addEventListener('touchstart', e => {
+  e.stopPropagation(); isScrubbing = true; scrubAt(e.touches[0].clientX);
+  stopFrameMode(); video.pause(); isPlaying = false; setPlayIcon(false);
+}, { passive: false });
+thumbnailStrip.addEventListener('touchmove', e => {
+  if (!isScrubbing) return;
+  e.preventDefault(); e.stopPropagation();
+  scrubAt(e.touches[0].clientX);
+}, { passive: false });
+thumbnailStrip.addEventListener('touchend', () => isScrubbing = false);
+thumbnailStrip.addEventListener('touchcancel', () => isScrubbing = false);
+thumbnailStrip.addEventListener('mousedown', e => {
+  e.stopPropagation(); isScrubbing = true; scrubAt(e.clientX);
+  stopFrameMode(); video.pause(); isPlaying = false; setPlayIcon(false);
+});
+document.addEventListener('mousemove', e => { if (isScrubbing) scrubAt(e.clientX); });
+document.addEventListener('mouseup', () => isScrubbing = false);
+
+// ── Progress bar scrub ──
+const progressWrap = document.getElementById('progress-bar-wrap');
+function scrubProg(cx) {
+  const r = progressWrap.getBoundingClientRect();
+  video.currentTime = Math.max(0, Math.min(1, (cx - r.left) / r.width)) * duration;
+  updateUI();
+}
+progressWrap.addEventListener('touchstart', e => {
+  e.stopPropagation(); scrubProg(e.touches[0].clientX);
+  stopFrameMode(); video.pause(); isPlaying = false; setPlayIcon(false);
+}, { passive: true });
+progressWrap.addEventListener('touchmove', e => scrubProg(e.touches[0].clientX), { passive: true });
+progressWrap.addEventListener('mousedown', e => { e.stopPropagation(); scrubProg(e.clientX); });
+
+// ── Loop range ──
+let loopIn = null, loopOut = null, loopActive = false;
+const loopRangeOverlay = document.getElementById('loop-range-overlay');
+const loopRangeDisplay = document.getElementById('loop-range-display');
+const loopToggleBtn    = document.getElementById('loop-toggle');
+const loopSetInBtn     = document.getElementById('loop-set-in');
+const loopSetOutBtn    = document.getElementById('loop-set-out');
+
+function updateLoopOverlay() {
+  if (loopIn !== null && loopOut !== null && duration > 0) {
+    const l = (loopIn / duration) * 100;
+    const w = ((loopOut - loopIn) / duration) * 100;
+    loopRangeOverlay.style.left  = l + '%';
+    loopRangeOverlay.style.width = w + '%';
+    loopRangeOverlay.classList.add('show');
+    loopRangeDisplay.textContent = `${formatTime(loopIn)} → ${formatTime(loopOut)}`;
+  } else {
+    loopRangeOverlay.classList.remove('show');
+    loopRangeDisplay.textContent = '—';
+  }
+}
+
+loopSetInBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  loopIn = video.currentTime;
+  if (loopOut !== null && loopIn >= loopOut) loopOut = null;
+  loopSetInBtn.classList.add('set');
+  loopSetOutBtn.classList.toggle('set', loopOut !== null);
+  updateLoopOverlay();
+  showToast(`IN: ${formatTime(loopIn)}`);
+  resetAutoHide();
+});
+
+loopSetOutBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  loopOut = video.currentTime;
+  if (loopIn !== null && loopOut <= loopIn) loopIn = null;
+  loopSetOutBtn.classList.add('set');
+  loopSetInBtn.classList.toggle('set', loopIn !== null);
+  updateLoopOverlay();
+  showToast(`OUT: ${formatTime(loopOut)}`);
+  resetAutoHide();
+});
+
+loopToggleBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  if (loopIn === null || loopOut === null) {
+    showToast('請先設定 IN / OUT'); resetAutoHide(); return;
+  }
+  loopActive = !loopActive;
+  loopToggleBtn.classList.toggle('active', loopActive);
+  if (loopActive) {
+    video.currentTime = loopIn;
+    if (video.paused) togglePlay();
+    showToast('循環播放開啟');
+  } else {
+    showToast('循環播放關閉');
+  }
+  resetAutoHide();
+});
+
+document.getElementById('loop-clear').addEventListener('click', e => {
+  e.stopPropagation();
+  resetLoop();
+  showToast('已清除範圍');
+  resetAutoHide();
+});
+
+// Monitor loop: jump back to IN when OUT is reached
+video.addEventListener('timeupdate', () => {
+  if (loopActive && loopOut !== null && video.currentTime >= loopOut) {
+    video.currentTime = loopIn;
+  }
+});
+
+// Reset loop when loading new file
+function resetLoop() {
+  loopIn = null; loopOut = null; loopActive = false;
+  loopToggleBtn.classList.remove('active');
+  loopSetInBtn.classList.remove('set');
+  loopSetOutBtn.classList.remove('set');
+  updateLoopOverlay();
+}
+
+// ── Save frame PNG ──
+document.getElementById('save-btn').addEventListener('click', e => {
+  e.stopPropagation();
+  video.pause(); isPlaying = false; setPlayIcon(false);
+  const w = video.videoWidth, h = video.videoHeight;
+  hiddenCanvas.width = w; hiddenCanvas.height = h;
+  const ctx = hiddenCanvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(video, 0, 0, w, h);
+  const frame = Math.round(video.currentTime * fps);
+  const tc = formatTime(video.currentTime).replace(/[:.]/g, '_');
+  hiddenCanvas.toBlob(blob => {
+    if (!blob) { showToast('截圖失敗'); return; }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `frame_${String(frame).padStart(6,'0')}_${tc}.png`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    showToast(`已儲存 Frame ${frame}（PNG）`);
+  }, 'image/png');
+  resetAutoHide();
+});
+
+// Prevent control taps from toggling play
+controls.addEventListener('click', e => e.stopPropagation());
+
+// ── Wake Lock: keep screen on while video is loaded ──
+let wakeLock = null;
+
+async function requestWakeLock() {
+  if (!('wakeLock' in navigator)) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+  } catch(e) {}
+}
+
+async function releaseWakeLock() {
+  if (wakeLock) { try { await wakeLock.release(); } catch(e) {} wakeLock = null; }
+}
+
+// Re-acquire after tab becomes visible again (iOS releases it on background)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && playerScreen.style.display !== 'none') {
+    requestWakeLock();
+  }
+});
+
+// ── Export clip (mp4box.js pure JS) ──
+const exportOverlay   = document.getElementById('export-overlay');
+const exportStatus    = document.getElementById('export-status');
+const exportProgressF = document.getElementById('export-progress-fill');
+const exportCancelBtn = document.getElementById('export-cancel');
+let ffmpegInstance = null;
+let ffmpegLoaded = false;
+let exportCancelled = false;
+
+document.getElementById('loop-export').addEventListener('click', async e => {
+  e.stopPropagation();
+  if (loopIn === null || loopOut === null) { showToast('請先設定 IN / OUT'); return; }
+  if (!currentFile) { showToast('沒有影片檔案'); return; }
+
+  exportCancelled = false;
+  exportOverlay.classList.add('show');
+  exportStatus.textContent = '分析影片結構…';
+  exportProgressF.style.width = '5%';
+
+  try {
+    const base = currentFile.name.replace(/\.[^.]+$/, '') || 'clip';
+    const ss   = loopIn.toFixed(3);
+    const blob = await mp4boxClip(currentFile, loopIn, loopOut,
+      pct => { exportProgressF.style.width = Math.round(5 + pct * 90) + '%'; });
+
+    exportProgressF.style.width = '100%';
+    exportStatus.textContent = '完成！';
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `${base}_clip_${ss.replace('.','_')}.mp4`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+    setTimeout(() => exportOverlay.classList.remove('show'), 1500);
+    showToast('剪輯完成');
+
+  } catch(err) {
+    exportOverlay.classList.remove('show');
+    showToast('剪輯失敗：' + (err?.message || String(err)));
+  }
+});
+
+exportCancelBtn.addEventListener('click', () => {
+  exportCancelled = true;
+  exportOverlay.classList.remove('show');
+  showToast('已取消');
+});
+
+// ── mp4box.js clip: parse moov → extract samples → rebuild MP4 ──
+async function mp4boxClip(file, clipIn, clipOut, onProgress) {
   const SCAN = Math.min(10 * 1024 * 1024, file.size);
 
-  // 1. Find ftyp + moov
+  function u32(b,o){return(b[o]<<24|b[o+1]<<16|b[o+2]<<8|b[o+3])>>>0;}
+  function w32(b,o,v){v>>>=0;b[o]=v>>>24;b[o+1]=(v>>>16)&255;b[o+2]=(v>>>8)&255;b[o+3]=v&255;}
+
+  // 1. Find moov + ftyp
   let ftypBytes = null, moovBytes = null;
-  async function scanBuf(ab) {
+  async function findBoxes(ab) {
     const b = new Uint8Array(ab); let off = 0;
     while (off + 8 <= b.length) {
-      const sz = (b[off]<<24|b[off+1]<<16|b[off+2]<<8|b[off+3])>>>0;
+      const sz = u32(b,off);
       const nm = String.fromCharCode(b[off+4],b[off+5],b[off+6],b[off+7]);
       if (sz < 8) break;
       if (nm === 'ftyp') ftypBytes = b.slice(off, off+sz);
-      if (nm === 'moov') { moovBytes = b.slice(off, Math.min(off+sz, b.length)); return; }
+      if (nm === 'moov') { moovBytes = b.slice(off, Math.min(off+sz, b.length)); return true; }
       off += sz;
     }
+    return false;
   }
-  await scanBuf(await readFileSlice(file, 0, SCAN));
+  await findBoxes(await readFileSlice(file, 0, SCAN));
   if (!moovBytes && file.size > SCAN) {
     const tail = new Uint8Array(await readFileSlice(file, file.size-SCAN, file.size));
     for (let i = 4; i+8 <= tail.length; i++) {
       if (String.fromCharCode(tail[i],tail[i+1],tail[i+2],tail[i+3]) === 'moov') {
-        const sz = (tail[i-4]<<24|tail[i-3]<<16|tail[i-2]<<8|tail[i-1])>>>0;
-        moovBytes = tail.slice(i-4, Math.min(i-4+sz, tail.length));
-        break;
+        const sz = u32(tail, i-4);
+        moovBytes = tail.slice(i-4, Math.min(i-4+sz, tail.length)); break;
       }
     }
   }
   if (!moovBytes) throw new Error('找不到 moov');
 
-  // 2. Parse video track
-  const vt = parseVideoTrackFull(moovBytes.buffer);
-  if (!vt || !vt.stco.length) throw new Error('找不到視訊軌');
-  const { timescale, stts, stsc, stco, stsz, fixedSampleSize } = vt;
-  const TC = stco.length;
-
-  function u32(b,o){return(b[o]<<24|b[o+1]<<16|b[o+2]<<8|b[o+3])>>>0;}
-  function w32(b,o,v){v>>>=0;b[o]=v>>>24;b[o+1]=(v>>>16)&255;b[o+2]=(v>>>8)&255;b[o+3]=v&255;}
-
-  // 3. Helpers
-  function spc(ci) {
-    let r=1;
-    for (let i=stsc.length-1;i>=0;i--)
-      if (ci>=stsc[i].firstChunk-1){r=stsc[i].samplesPerChunk;break;}
-    return r;
-  }
-  const css=new Array(TC);{let s=0;for(let c=0;c<TC;c++){css[c]=s;s+=spc(c);}}
-  const TS=css[TC-1]+spc(TC-1);
-
-  function time2s(sec) {
-    const tgt=Math.round(sec*timescale);let s=0,t=0;
-    for(const e of stts){
-      if(!e.delta){s+=e.count;continue;}
-      const end=t+e.count*e.delta;
-      if(end>tgt)return s+Math.floor((tgt-t)/e.delta);
-      t=end;s+=e.count;
-    }
-    return Math.min(s,TS);
-  }
-  function sampleSz(si){return fixedSampleSize>0?fixedSampleSize:(si<stsz.length?stsz[si]:0);}
-
-  // 4. Find chunk range
-  const s0=time2s(clipIn), s1=Math.min(TS,time2s(clipOut));
-  let c0=0;for(let c=0;c<TC-1;c++){if(css[c+1]>s0)break;c0=c+1;}c0=Math.min(c0,TC-1);
-  let c1=c0;for(let c=c0;c<TC;c++){c1=c;if(css[c]+spc(c)>=s1)break;}
-
-  // 5. Byte range
-  const byteStart=stco[c0];
-  let byteEnd=c1+1<TC?stco[c1+1]:stco[c1]+(()=>{let b=0,n=spc(c1);for(let i=0;i<n;i++)b+=sampleSz(css[c1]+i);return b;})();
-  byteEnd=Math.min(byteEnd,file.size);
-
-  const mdatPayload=new Uint8Array(await readFileSlice(file,byteStart,byteEnd));
-
-  // 6. Simple stco patch: adjust all offsets by delta
-  // New layout: [ftyp][moov][mdat(8)][payload]
-  const ftypSz = ftypBytes ? ftypBytes.length : 0;
-  const moovSz = moovBytes.length;
-  const delta = (ftypSz + moovSz + 8) - byteStart;
-
-  // Patch a copy of moov
-  const patchedMoov = moovBytes.slice();
-  function patchStco(b, s, e) {
-    let off=s;
-    while(off+8<=e){
-      const sz=u32(b,off);
-      const nm=String.fromCharCode(b[off+4],b[off+5],b[off+6],b[off+7]);
-      if(sz<8)break;
-      const ce=Math.min(off+sz,e);
-      if(['trak','mdia','minf','stbl'].includes(nm)) patchStco(b,off+8,ce);
-      else if(nm==='stco'){
-        const cnt=u32(b,off+12);
-        for(let i=0;i<cnt;i++){
-          const p=off+16+i*4;
-          if(p+4>b.length)break;
-          const orig=u32(b,p);
-          // Only adjust offsets that fall within our byte range
-          if(orig>=byteStart&&orig<=byteEnd) w32(b,p,orig+delta);
-        }
-      }
-      off+=sz;
-    }
-  }
-  patchStco(patchedMoov, 8, patchedMoov.length);
-
-  // 7. mdat header
-  const mdatHdr=new Uint8Array(8);
-  w32(mdatHdr,0,mdatPayload.length+8);
-  mdatHdr[4]=0x6D;mdatHdr[5]=0x64;mdatHdr[6]=0x61;mdatHdr[7]=0x74;
-
-  const parts=[];
-  if(ftypBytes)parts.push(ftypBytes);
-  parts.push(patchedMoov,mdatHdr,mdatPayload);
-
-  const mime=file.type||(file.name.toLowerCase().endsWith('.mov')?'video/quicktime':'video/mp4');
-  return new Blob(parts,{type:mime});
-}
-
-function parseVideoTrackFull(moovBuf) {
-  const view = new DataView(moovBuf);
-  let off = 8;
-  while (off + 8 <= moovBuf.byteLength) {
-    const sz = readU32(view, off), nm = read4cc(view, off + 4);
-    if (sz < 8) break;
-    if (nm === 'trak') {
-      const t = parseTrakFull(view, off + 8, Math.min(off + sz, moovBuf.byteLength));
-      if (t && t.isVideo) return t;
-    }
-    off += sz;
-  }
-  return null;
-}
-
-function parseTrakFull(view, start, end) {
-  let timescale = null, isVideo = false;
-  let stts = [], stsc = [], stco = [], stsz = [], stss = [], ctts = [], fixedSampleSize = 0;
-
-  function walk(s, e) {
-    let off = s;
-    while (off + 8 <= e) {
-      const sz = readU32(view, off), nm = read4cc(view, off + 4);
-      if (sz < 8) break;
-      const cs = off + 8, ce = Math.min(off + sz, e);
-      if (['mdia','minf','stbl'].includes(nm)) { walk(cs, ce); }
-      else if (nm === 'mdhd') { timescale = parseMdhd(view, cs, ce); }
-      else if (nm === 'hdlr') { if (parseHdlr(view, cs, ce)) isVideo = true; }
-      else if (nm === 'stts') {
-        const cnt = readU32(view, cs + 4);
-        for (let i = 0; i < cnt && cs + 8 + i*8 + 7 < ce; i++)
-          stts.push({ count: readU32(view, cs+8+i*8), delta: readU32(view, cs+8+i*8+4) });
-      }
-      else if (nm === 'stsc') {
-        const cnt = readU32(view, cs + 4);
-        for (let i = 0; i < cnt && cs + 8 + i*12 + 11 < ce; i++)
-          stsc.push({ firstChunk: readU32(view, cs+8+i*12), samplesPerChunk: readU32(view, cs+8+i*12+4) });
-      }
-      else if (nm === 'stco') {
-        const cnt = readU32(view, cs + 4);
-        for (let i = 0; i < cnt && cs + 8 + i*4 + 3 < ce; i++)
-          stco.push(readU32(view, cs+8+i*4));
-      }
-      else if (nm === 'co64') {
-        const cnt = readU32(view, cs + 4);
-        for (let i = 0; i < cnt && cs + 8 + i*8 + 7 < ce; i++)
-          stco.push(readU32(view, cs+8+i*8) * 0x100000000 + readU32(view, cs+8+i*8+4));
-      }
-      else if (nm === 'stsz') {
-        fixedSampleSize = readU32(view, cs + 4);
-        if (!fixedSampleSize) {
-          const cnt = readU32(view, cs + 8);
-          for (let i = 0; i < cnt && cs + 12 + i*4 + 3 < ce; i++)
-            stsz.push(readU32(view, cs+12+i*4));
-        }
-      }
-      else if (nm === 'stss') {
-        const cnt = readU32(view, cs + 4);
-        for (let i = 0; i < cnt && cs + 8 + i*4 + 3 < ce; i++)
-          stss.push(readU32(view, cs+8+i*4) - 1); // convert to 0-based
-      }
-      else if (nm === 'ctts') {
-        const cnt = readU32(view, cs + 4);
-        for (let i = 0; i < cnt && cs + 8 + i*8 + 7 < ce; i++)
-          ctts.push({ count: readU32(view, cs+8+i*8), offset: readU32(view, cs+8+i*8+4) });
-      }
-      off += sz;
-    }
-  }
-  walk(start, end);
-  if (!isVideo || !timescale) return null;
-  return { timescale, stts, stsc, stco, stsz, stss, ctts, fixedSampleSize, isVideo };
-}
-
-
-
-async function mp4boxClip(file, clipIn, clipOut, onProgress) {
-  const SCAN = Math.min(10 * 1024 * 1024, file.size);
-
-  // ── helpers ──
-  function u32(b,o){return((b[o]<<24)|(b[o+1]<<16)|(b[o+2]<<8)|b[o+3])>>>0;}
-  function w32(b,o,v){v>>>=0;b[o]=v>>>24;b[o+1]=(v>>>16)&255;b[o+2]=(v>>>8)&255;b[o+3]=v&255;}
-  function nm4(b,o){return String.fromCharCode(b[o],b[o+1],b[o+2],b[o+3]);}
-  function concat(arrays){
-    let n=0; for(const a of arrays)n+=a.length;
-    const out=new Uint8Array(n); let p=0;
-    for(const a of arrays){out.set(a,p);p+=a.length;} return out;
-  }
-  function mkBox(name, ...children){
-    const payload = concat(children);
-    const b = new Uint8Array(8 + payload.length);
-    w32(b,0,8+payload.length);
-    for(let i=0;i<4;i++) b[4+i]=name.charCodeAt(i);
-    b.set(payload,8); return b;
-  }
-  function u32arr(arr){
-    const b=new Uint8Array(4+arr.length*4);
-    w32(b,0,arr.length);
-    arr.forEach((v,i)=>w32(b,4+i*4,v)); return b;
-  }
-
-  // ── find moov ──
-  let moovU8 = null, ftypU8 = null;
-  async function findMoov(ab){
-    const b=new Uint8Array(ab); let off=0;
-    while(off+8<=b.length){
-      const sz=u32(b,off), nm=nm4(b,off+4);
-      if(sz<8)break;
-      if(nm==='ftyp') ftypU8=b.slice(off,off+sz);
-      if(nm==='moov'){moovU8=b.slice(off,Math.min(off+sz,b.length));return true;}
-      off+=sz;
-    } return false;
-  }
-  await findMoov(await readFileSlice(file,0,SCAN));
-  if(!moovU8&&file.size>SCAN){
-    const tail=new Uint8Array(await readFileSlice(file,file.size-SCAN,file.size));
-    for(let i=4;i+8<=tail.length;i++){
-      if(nm4(tail,i)==='moov'){
-        const sz=u32(tail,i-4);
-        moovU8=tail.slice(i-4,Math.min(i-4+sz,tail.length)); break;
-      }
-    }
-  }
-  if(!moovU8) throw new Error('找不到 moov');
-
-  // ── parse video track ──
-  const vt = parseVideoTrackFull(moovU8.buffer);
-  if(!vt||!vt.stco.length) throw new Error('找不到視訊軌');
-  const {timescale,stts,stsc,stco,stsz,stss,ctts,fixedSampleSize} = vt;
-  const TC=stco.length;
-
-  function spc(ci){
-    let r=1;
-    for(let i=stsc.length-1;i>=0;i--)
-      if(ci>=stsc[i].firstChunk-1){r=stsc[i].samplesPerChunk;break;}
-    return r;
-  }
-  const css=new Array(TC);{let s=0;for(let c=0;c<TC;c++){css[c]=s;s+=spc(c);}}
-  const TS=css[TC-1]+spc(TC-1);
-
-  function time2s(sec){
-    const tgt=Math.round(sec*timescale);let s=0,t=0;
-    for(const e of stts){
-      if(!e.delta){s+=e.count;continue;}
-      const end=t+e.count*e.delta;
-      if(end>tgt)return s+Math.floor((tgt-t)/e.delta);
-      t=end;s+=e.count;
-    } return Math.min(s,TS);
-  }
-  function ssz(si){return fixedSampleSize>0?fixedSampleSize:(si<stsz.length?stsz[si]:0);}
-
-  // snap to keyframe
-  let s0=time2s(clipIn);
-  if(stss.length){let kf=stss[0];for(const k of stss){if(k<=s0)kf=k;else break;}s0=kf;}
-  const s1=Math.min(TS,time2s(clipOut));
-  if(s0>=s1) throw new Error('剪輯範圍無效');
-
-  // DTS table
-  const dts=[];{let t=0;for(const e of stts){for(let i=0;i<e.count;i++){dts.push(t);t+=e.delta;}}}
-  const ctsOff=new Array(dts.length).fill(0);
-  if(ctts&&ctts.length){let si=0;for(const e of ctts){for(let i=0;i<e.count&&si<dts.length;i++)ctsOff[si++]=e.offset;}}
-
-  // chunk range
-  let c0=0;for(let c=0;c<TC-1;c++){if(css[c+1]>s0)break;c0=c+1;}c0=Math.min(c0,TC-1);
-  let c1=c0;for(let c=c0;c<TC;c++){c1=c;if(css[c]+spc(c)>=s1)break;}
-
-  // byte range
-  const byteStart=stco[c0];
-  let byteEnd=c1+1<TC?stco[c1+1]:stco[c1]+(()=>{let b=0,n=spc(c1);for(let i=0;i<n;i++)b+=ssz(css[c1]+i);return b;})();
-  byteEnd=Math.min(byteEnd,file.size);
-
-  onProgress&&onProgress(0.1);
-  const mdat=new Uint8Array(await readFileSlice(file,byteStart,byteEnd));
-  onProgress&&onProgress(0.5);
-
-  // ── find stsd in moov (copy verbatim) ──
-  let stsdU8=null;
-  for(let i=4;i+8<=moovU8.length;i++){
-    if(nm4(moovU8,i)==='stsd'){
-      const sz=u32(moovU8,i-4);
-      stsdU8=moovU8.slice(i-4,i-4+sz); break;
-    }
-  }
-  if(!stsdU8) throw new Error('找不到 stsd');
-
-  // ── build trimmed sample tables ──
-  const startDTS=dts[s0]||0;
-  const CC=c1-c0+1;
-
-  // stts
-  const newStts=[];{let si=0;for(const e of stts){const a=Math.max(si,s0),b=Math.min(si+e.count,s1);if(b>a)newStts.push([b-a,e.delta]);si+=e.count;if(si>=s1)break;}}
-  // stsc
-  const newStsc=[];for(let c=0;c<CC;c++){const n=spc(c0+c);if(!newStsc.length||n!==newStsc[newStsc.length-1][1])newStsc.push([c+1,n,1]);}
-  // stsz
-  const newStsz=fixedSampleSize>0?null:Array.from({length:s1-s0},(_,i)=>ssz(s0+i));
-  // stss (1-based, relative to clip start)
-  const newStss=stss.filter(k=>k>=s0&&k<s1).map(k=>k-s0+1);
-  // ctts
-  const newCtts=[];if(ctts&&ctts.length){let si=0;for(const e of ctts){const a=Math.max(si,s0),b=Math.min(si+e.count,s1);if(b>a)newCtts.push([b-a,e.offset]);si+=e.count;if(si>=s1)break;}}
-  // stco (new file layout: ftyp + moov + 8 + mdat)
-  let clipDurTicks=0;for(const [c,d] of newStts)clipDurTicks+=c*d;
-
-  // ── build stbl ──
-  function mkStts(){const b=new Uint8Array(8+newStts.length*8);w32(b,4,newStts.length);newStts.forEach(([c,d],i)=>{w32(b,8+i*8,c);w32(b,8+i*8+4,d);});return mkBox('stts',b);}
-  function mkStsc(){const b=new Uint8Array(8+newStsc.length*12);w32(b,4,newStsc.length);newStsc.forEach(([f,s,d],i)=>{w32(b,8+i*12,f);w32(b,8+i*12+4,s);w32(b,8+i*12+8,d);});return mkBox('stsc',b);}
-  function mkStco(offs){const b=new Uint8Array(8+offs.length*4);w32(b,4,offs.length);offs.forEach((o,i)=>w32(b,8+i*4,o));return mkBox('stco',b);}
-  function mkStsz(){if(!newStsz){const b=new Uint8Array(12);w32(b,4,fixedSampleSize);return mkBox('stsz',b);}const b=new Uint8Array(12+newStsz.length*4);w32(b,8,newStsz.length);newStsz.forEach((s,i)=>w32(b,12+i*4,s));return mkBox('stsz',b);}
-  function mkStss(){if(!newStss.length)return new Uint8Array(0);const b=new Uint8Array(8+newStss.length*4);w32(b,4,newStss.length);newStss.forEach((v,i)=>w32(b,8+i*4,v));return mkBox('stss',b);}
-  function mkCtts(){if(!newCtts.length)return new Uint8Array(0);const b=new Uint8Array(8+newCtts.length*8);w32(b,4,newCtts.length);newCtts.forEach(([c,o],i)=>{w32(b,8+i*8,c);const dv=new DataView(b.buffer,b.byteOffset+8+i*8+4,4);dv.setInt32(0,o,false);});return mkBox('ctts',b);}
-
-  function patchDur(orig,ticks){
-    const b=orig.slice();const dv=new DataView(b.buffer,b.byteOffset);
-    const ver=b[0];
-    if(ver===1){dv.setUint32(24,0,false);dv.setUint32(28,ticks,false);}
-    else dv.setUint32(16,ticks,false);
-    return b;
-  }
-
-  // get movie timescale
-  let mvTs=1000;
-  for(let off=8;off+8<=moovU8.length;){
-    const sz=u32(moovU8,off),nm=nm4(moovU8,off+4);if(sz<8)break;
-    if(nm==='mvhd'){const ver=moovU8[off+8];mvTs=u32(moovU8,off+8+(ver===1?20:12));break;}
-    off+=sz;
-  }
-  const mvDur=Math.round((clipOut-clipIn)*mvTs);
-
-  // ── Two-pass moov build (need to know moov size for stco) ──
-  function buildMoov(stcoOffsets){
-    const moovParts=[];
-    let off=8;
-    while(off+8<=moovU8.length){
-      const sz=u32(moovU8,off),nm=nm4(moovU8,off+4);if(sz<8)break;
-      const cs=off+8,ce=Math.min(off+sz,moovU8.length);
-      if(nm==='mvhd'){
-        const content=moovU8.slice(cs,ce);
-        const patched=patchDur(content,mvDur);
-        moovParts.push(mkBox('mvhd',patched));
-      } else if(nm==='trak'){
-        // Check if video trak
-        let isVid=false;
-        for(let ti=cs;ti+8<=ce;){const tsz=u32(moovU8,ti),tnm=nm4(moovU8,ti+4);if(tsz<8)break;
-          if(tnm==='mdia'){for(let mi=ti+8;mi+8<=Math.min(ti+tsz,ce);){const msz=u32(moovU8,mi),mnm=nm4(moovU8,mi+4);if(msz<8)break;
-            if(mnm==='hdlr'&&mi+8+8<=Math.min(mi+msz,ce)){isVid=nm4(moovU8,mi+8+8)==='vide';break;}
-            mi+=msz;}} break; ti+=tsz;}
-        if(!isVid){off+=sz;continue;} // skip non-video traks
-
-        // Build video trak
-        const trakParts=[];
-        for(let ti=cs;ti+8<=ce;){const tsz=u32(moovU8,ti),tnm=nm4(moovU8,ti+4);if(tsz<8)break;
-          const tcs=ti+8,tce=Math.min(ti+tsz,ce);
-          if(tnm==='tkhd'){trakParts.push(mkBox('tkhd',patchDur(moovU8.slice(tcs,tce),mvDur)));}
-          else if(tnm==='mdia'){
-            const mdiaParts=[];
-            for(let mi=tcs;mi+8<=tce;){const msz=u32(moovU8,mi),mnm=nm4(moovU8,mi+4);if(msz<8)break;
-              const mcs=mi+8,mce=Math.min(mi+msz,tce);
-              if(mnm==='mdhd'){mdiaParts.push(mkBox('mdhd',patchDur(moovU8.slice(mcs,mce),clipDurTicks)));}
-              else if(mnm==='minf'){
-                const minfParts=[];
-                for(let ii=mcs;ii+8<=mce;){const isz=u32(moovU8,ii),inm=nm4(moovU8,ii+4);if(isz<8)break;
-                  const ics=ii+8,ice=Math.min(ii+isz,mce);
-                  if(inm==='stbl'){
-                    const stblParts=[stsdU8,mkStts(),mkStsc(),mkStsz(),mkStco(stcoOffsets),mkStss(),mkCtts()];
-                    minfParts.push(mkBox('stbl',...stblParts.filter(x=>x.length>0)));
-                  } else minfParts.push(moovU8.slice(ii,ice));
-                  ii+=isz;}
-                mdiaParts.push(mkBox('minf',...minfParts));
-              } else mdiaParts.push(moovU8.slice(mi,mce));
-              mi+=msz;}
-            trakParts.push(mkBox('mdia',...mdiaParts));
-          } else if(tnm==='edts'){}// skip
-          else trakParts.push(moovU8.slice(ti,tce));
-          ti+=tsz;}
-        moovParts.push(mkBox('trak',...trakParts));
-      }
-      // skip non-video traks, udta, meta
-      off+=sz;
-    }
-    return mkBox('moov',...moovParts);
-  }
-
-  // Pass 1: measure moov size
-  const moov0=buildMoov(new Array(CC).fill(0));
-  const ftypSz=ftypU8?ftypU8.length:0;
-  const mdatStart=ftypSz+moov0.length+8;
-
-  // Pass 2: real stco
-  const relOffsets=Array.from({length:CC},(_,c)=>stco[c0+c]-byteStart);
-  const finalStco=relOffsets.map(r=>r+mdatStart);
-  const moovFinal=buildMoov(finalStco);
-
-  // If sizes differ (shouldn't happen), recalculate
-  let finalMoov=moovFinal;
-  if(moovFinal.length!==moov0.length){
-    const mdatStart2=ftypSz+moovFinal.length+8;
-    const finalStco2=relOffsets.map(r=>r+mdatStart2);
-    finalMoov=buildMoov(finalStco2);
-  }
-
-  // mdat header
-  const mdatHdr=new Uint8Array(8);
-  w32(mdatHdr,0,mdat.length+8);
-  mdatHdr[4]=0x6D;mdatHdr[5]=0x64;mdatHdr[6]=0x61;mdatHdr[7]=0x74;
-
-  const parts=[];
-  if(ftypU8)parts.push(ftypU8);
-  parts.push(finalMoov,mdatHdr,mdat);
-  onProgress&&onProgress(1);
-
-  const mime=file.type||(file.name.toLowerCase().endsWith('.mov')?'video/quicktime':'video/mp4');
-  return new Blob(parts,{type:mime});
-}
-
-
-function seekExact(t) {
-  return new Promise(resolve => {
-    const clamped = Math.max(0, Math.min(duration - 0.001, t));
-    if (Math.abs(video.currentTime - clamped) < 0.0001) { resolve(); return; }
-    let settled = false;
-    function done() {
-      if (settled) return; settled = true;
-      video.removeEventListener('seeked', onSeeked);
-      resolve();
-    }
-    function onSeeked() { setTimeout(done, 30); }
-    video.addEventListener('seeked', onSeeked);
-    video.currentTime = clamped;
-    setTimeout(done, 2000); // longer timeout for clipped files
-  });
-}
-
-// ── Thumbnails ──
-async function generateThumbnails() {
-  thumbCanvasStrip.innerHTML = '';
-  thumbStatus.style.display = 'block';
-  thumbStatus.textContent = '生成縮圖中…';
-  await new Promise(r => setTimeout(r, 100));
-
-  if (!video.videoWidth || !video.duration) {
-    thumbStatus.style.display = 'none'; return;
-  }
-
-  const W = thumbnailStrip.offsetWidth || 320;
-  const H = thumbnailStrip.offsetHeight || 50;
-  const vw = video.videoWidth || 16;
-  const vh = video.videoHeight || 9;
-  const aspect = vw / vh;
-  const tw = Math.round(H * aspect);
-  const count = Math.max(6, Math.round(W / tw));
-
-  for (let i = 0; i < count; i++) {
-    try {
-      await seekExact((i / count) * duration);
-      const c = document.createElement('canvas');
-      c.width = tw; c.height = H;
-      c.getContext('2d').drawImage(video, 0, 0, tw, H);
-      c.style.cssText = `width:${tw}px;height:${H}px;flex-shrink:0;`;
-      thumbCanvasStrip.appendChild(c);
-    } catch(e) {}
-  }
-
-  thumbStatus.style.display = 'none';
-  try { await seekExact(0); } catch(e) {}
-  updateUI();
-}
-
-// ── Play / Pause ──
-function setPlayIcon(on) {
-  if (on) {
-    playIcon.innerHTML = '<rect x="6" y="4" width="4" height="16" fill="#fff" stroke="#fff"/><rect x="14" y="4" width="4" height="16" fill="#fff" stroke="#fff"/>';
-    playLabel.textContent = '暫停';
-  } else {
-    playIcon.innerHTML = '<polygon fill="#fff" stroke="#fff" points="5 3 19 12 5 21 5 3"/>';
-    playLabel.textContent = '播放';
-  }
-  syncMiniPlayIcon(on);
-}
-
-playBtn.addEventListener('click', e => { e.stopPropagation(); togglePlay(); });
-
-function togglePlay() {
-  if (frameMode) { toggleFrameMode(); hidePanel(); return; }
-  if (currentSpeed === 'frame') { toggleFrameMode(); hidePanel(); return; }
-  if (video.paused) {
-    video.play(); isPlaying = true; setPlayIcon(true); hidePanel();
-  } else {
-    video.pause(); isPlaying = false; setPlayIcon(false); clearTimeout(autoHideTimer);
-  }
-}
-
-// ── Frame mode ──
-function stopFrameMode() {
-  if (frameInterval) { clearInterval(frameInterval); frameInterval = null; }
-  frameMode = false;
-}
-function toggleFrameMode() {
-  if (frameMode) { stopFrameMode(); setPlayIcon(false); return; }
-  video.pause(); isPlaying = false;
-  frameMode = true; setPlayIcon(true);
-  const spf = 1 / fps;
-  frameInterval = setInterval(() => {
-    if (!frameMode) return;
-    const next = video.currentTime + spf;
-    if (next >= duration) { stopFrameMode(); setPlayIcon(false); return; }
-    const done = () => { video.removeEventListener('seeked', done); updateUI(); };
-    video.addEventListener('seeked', done);
-    video.currentTime = next;
-  }, 1000);
-}
-
-video.addEventListener('timeupdate', updateUI);
-video.addEventListener('ended', () => {
-  isPlaying = false; setPlayIcon(false); stopFrameMode(); clearTimeout(autoHideTimer);
-});
-
-// ── Speed buttons ──
-document.querySelectorAll('.speed-btn').forEach(btn => {
-  btn.addEventListener('click', e => {
-    e.stopPropagation();
-    document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    stopFrameMode();
-    const s = btn.dataset.speed;
-    if (s === 'frame') {
-      video.pause(); isPlaying = false; currentSpeed = 'frame'; video.playbackRate = 1;
-      toggleFrameMode();
-    } else {
-      currentSpeed = parseFloat(s);
-      video.playbackRate = currentSpeed;
-      if (!video.paused) setPlayIcon(true);
-    }
-    resetAutoHide();
-  });
-});
-
-// ── ±5s ──
-document.getElementById('back5-btn').addEventListener('click', e => {
-  e.stopPropagation();
-  stopFrameMode(); video.currentTime = Math.max(0, video.currentTime - 5);
-  updateUI(); resetAutoHide();
-});
-document.getElementById('fwd5-btn').addEventListener('click', e => {
-  e.stopPropagation();
-  stopFrameMode(); video.currentTime = Math.min(duration, video.currentTime + 5);
-  updateUI(); resetAutoHide();
-});
-
-// ── Prev / Next frame with long-press ──
-
-function stepFrame(dir) {
-  if (stepFramePending) return;
-  stopFrameMode();
-  isSeeking = false;
-  video.pause(); isPlaying = false; setPlayIcon(false);
-  const next = Math.max(0, Math.min(duration - 0.001, video.currentTime + dir / fps));
-  stepFramePending = true;
-  let settled = false;
-  function done() {
-    if (settled) return; settled = true;
-    stepFramePending = false;
-    video.removeEventListener('seeked', done);
-    updateUI();
-  }
-  video.addEventListener('seeked', done);
-  video.currentTime = next;
-  setTimeout(done, 2000);
-}
-function setupLongPress(el, dir) {
-  let pt = null, rt = null;
-  function start(e) {
-    e.preventDefault(); e.stopPropagation();
-    stepFrame(dir);
-    pt = setTimeout(() => { rt = setInterval(() => stepFrame(dir), 80); }, 380);
-  }
-  function stop() { clearTimeout(pt); clearInterval(rt); pt = null; rt = null; }
-  el.addEventListener('touchstart', start, { passive: false });
-  el.addEventListener('touchend', stop);
-  el.addEventListener('touchcancel', stop);
-  el.addEventListener('mousedown', start);
-  el.addEventListener('mouseup', stop);
-  el.addEventListener('mouseleave', stop);
-}
-setupLongPress(document.getElementById('prev-frame-btn'), -1);
-setupLongPress(document.getElementById('next-frame-btn'), +1);
-// Wire mini frame buttons with same long-press
-setupLongPress(document.getElementById('mini-prev'), -1);
-setupLongPress(document.getElementById('mini-next'), +1);
-
-// ── Timeline scrub ──
-
-function scrubAt(cx, commit) {
-  const r = thumbnailStrip.getBoundingClientRect();
-  scrubTargetTime = Math.max(0, Math.min(1, (cx - r.left) / r.width)) * duration;
-  if (commit) {
-    seekExact(scrubTargetTime).then(() => updateUI());
-  } else {
-    if (!scrubRaf) {
-      scrubRaf = requestAnimationFrame(() => {
-        scrubRaf = null;
-        const pct = scrubTargetTime / duration;
-        const indicator = document.getElementById('timeline-indicator');
-        if (indicator) indicator.style.left = (pct * 100) + '%';
-        if (timeDisplay) timeDisplay.textContent = formatTime(scrubTargetTime);
-        const f = Math.round(scrubTargetTime * fps);
-        if (frameDisplay) frameDisplay.textContent = `F: ${f}`;
-      });
-    }
-  }
-}
-
-thumbnailStrip.addEventListener('touchstart', e => {
-  e.stopPropagation(); isScrubbing = true;
-  stopFrameMode(); video.pause(); isPlaying = false; setPlayIcon(false);
-  scrubAt(e.touches[0].clientX, false);
-}, { passive: false });
-thumbnailStrip.addEventListener('touchmove', e => {
-  if (!isScrubbing) return;
-  e.preventDefault(); e.stopPropagation();
-  scrubAt(e.touches[0].clientX, false);
-}, { passive: false });
-thumbnailStrip.addEventListener('touchend', e => {
-  if (!isScrubbing) return;
-  isScrubbing = false;
-  scrubAt(e.changedTouches[0].clientX, true); // seek only on release
-});
-thumbnailStrip.addEventListener('touchcancel', () => {
-  isScrubbing = false;
-  video.currentTime = scrubTargetTime;
-  updateUI();
-});
-thumbnailStrip.addEventListener('mousedown', e => {
-  e.stopPropagation(); isScrubbing = true;
-  stopFrameMode(); video.pause(); isPlaying = false; setPlayIcon(false);
-  scrubAt(e.clientX, false);
-});
-document.addEventListener('mousemove', e => { if (isScrubbing) scrubAt(e.clientX, false); });
-document.addEventListener('mouseup', e => {
-  if (!isScrubbing) return;
-  isScrubbing = false;
-  scrubAt(e.clientX, true);
-});
-
-// ── Progress bar scrub ──
-function scrubProg(cx) {
-  const r = progressWrap.getBoundingClientRect();
-  video.currentTime = Math.max(0, Math.min(1, (cx - r.left) / r.width)) * duration;
-  updateUI();
-}
-progressWrap.addEventListener('touchstart', e => {
-  e.stopPropagation(); scrubProg(e.touches[0].clientX);
-  stopFrameMode(); video.pause(); isPlaying = false; setPlayIcon(false);
-}, { passive: true });
-progressWrap.addEventListener('touchmove', e => scrubProg(e.touches[0].clientX), { passive: true });
-progressWrap.addEventListener('mousedown', e => { e.stopPropagation(); scrubProg(e.clientX); });
-
-// ── Loop range ──
-
-function updateLoopOverlay() {
-  if (loopIn !== null && loopOut !== null && duration > 0) {
-    const l = (loopIn / duration) * 100;
-    const w = ((loopOut - loopIn) / duration) * 100;
-    loopRangeOverlay.style.left  = l + '%';
-    loopRangeOverlay.style.width = w + '%';
-    loopRangeOverlay.classList.add('show');
-    loopRangeDisplay.textContent = `${formatTime(loopIn)} → ${formatTime(loopOut)}`;
-  } else {
-    loopRangeOverlay.classList.remove('show');
-    loopRangeDisplay.textContent = '—';
-  }
-}
-
-loopSetInBtn.addEventListener('click', e => {
-  e.stopPropagation();
-  loopIn = video.currentTime;
-  if (loopOut !== null && loopIn >= loopOut) loopOut = null;
-  loopSetInBtn.classList.add('set');
-  loopSetOutBtn.classList.toggle('set', loopOut !== null);
-  updateLoopOverlay();
-  showToast(`IN: ${formatTime(loopIn)}`);
-  resetAutoHide();
-});
-
-loopSetOutBtn.addEventListener('click', e => {
-  e.stopPropagation();
-  loopOut = video.currentTime;
-  if (loopIn !== null && loopOut <= loopIn) loopIn = null;
-  loopSetOutBtn.classList.add('set');
-  loopSetInBtn.classList.toggle('set', loopIn !== null);
-  updateLoopOverlay();
-  showToast(`OUT: ${formatTime(loopOut)}`);
-  resetAutoHide();
-});
-
-loopToggleBtn.addEventListener('click', e => {
-  e.stopPropagation();
-  if (loopIn === null || loopOut === null) {
-    showToast('請先設定 IN / OUT'); resetAutoHide(); return;
-  }
-  loopActive = !loopActive;
-  loopToggleBtn.classList.toggle('active', loopActive);
-  if (loopActive) {
-    video.currentTime = loopIn;
-    if (video.paused) togglePlay();
-    showToast('循環播放開啟');
-  } else {
-    showToast('循環播放關閉');
-  }
-  resetAutoHide();
-});
-
-document.getElementById('loop-clear').addEventListener('click', e => {
-  e.stopPropagation();
-  resetLoop();
-  showToast('已清除範圍');
-  resetAutoHide();
-});
-
-// Monitor loop: jump back to IN when OUT is reached
-video.addEventListener('timeupdate', () => {
-  if (loopActive && loopOut !== null && video.currentTime >= loopOut) {
-    video.currentTime = loopIn;
-  }
-});
-
-// Reset loop when loading new file
-function resetLoop() {
-  loopIn = null; loopOut = null; loopActive = false;
-  loopToggleBtn.classList.remove('active');
-  loopSetInBtn.classList.remove('set');
-  loopSetOutBtn.classList.remove('set');
-  updateLoopOverlay();
-}
-
-// ── Save frame PNG ──
-document.getElementById('save-btn').addEventListener('click', e => {
-  e.stopPropagation();
-  video.pause(); isPlaying = false; setPlayIcon(false);
-  const w = video.videoWidth, h = video.videoHeight;
-  hiddenCanvas.width = w; hiddenCanvas.height = h;
-  const ctx = hiddenCanvas.getContext('2d');
-  ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(video, 0, 0, w, h);
-  const frame = Math.round(video.currentTime * fps);
-  const tc = formatTime(video.currentTime).replace(/[:.]/g, '_');
-  hiddenCanvas.toBlob(blob => {
-    if (!blob) { showToast('截圖失敗'); return; }
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `frame_${String(frame).padStart(6,'0')}_${tc}.png`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
-    showToast(`已儲存 Frame ${frame}（PNG）`);
-  }, 'image/png');
-  resetAutoHide();
-});
-
-// Prevent control taps from toggling play
-controls.addEventListener('click', e => e.stopPropagation());
-
-// ── Wake Lock: keep screen on while video is loaded ──
-
-async function requestWakeLock() {
-  if (!('wakeLock' in navigator)) return;
-  try {
-    wakeLock = await navigator.wakeLock.request('screen');
-  } catch(e) {}
-}
-
-async function releaseWakeLock() {
-  if (wakeLock) { try { await wakeLock.release(); } catch(e) {} wakeLock = null; }
-}
-
-// Re-acquire after tab becomes visible again (iOS releases it on background)
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && playerScreen.style.display !== 'none') {
-    requestWakeLock();
-  }
-});
-
-// ── Export clip (FFmpeg.wasm) ──
-
-// ── Pending clip persistence ──
-function savePendingClip() {
-  if (loopIn === null || loopOut === null || !currentFile) return;
-  try {
-    localStorage.setItem('pendingClip', JSON.stringify({
-      loopIn, loopOut,
-      fileName: currentFile.name,
-      fileSize: currentFile.size,
-      format: document.getElementById('export-format')?.value || 'original',
-      crashCount: (JSON.parse(localStorage.getItem('pendingClip') || '{}').crashCount || 0) + 1,
-    }));
-  } catch(e) {}
-}
-function clearPendingClip() {
-  try { localStorage.removeItem('pendingClip'); } catch(e) {}
-}
-
-document.getElementById('loop-export').addEventListener('click', e => {
-  e.stopPropagation();
-  showToast('按下剪輯', 3000);
-
-  Promise.resolve().then(async () => {
-    if (loopIn === null || loopOut === null) { showToast('請先設定 IN / OUT', 4000); return; }
-    if (!currentFile) { showToast('沒有影片檔案', 4000); return; }
-
-    savePendingClip();
-    const overlay = document.getElementById('export-overlay');
-    const status  = document.getElementById('export-status');
-    const bar     = document.getElementById('export-progress-fill');
-
-    if (!overlay) { showToast('找不到 overlay 元素', 6000); return; }
-
-    overlay.classList.add('show');
-    status.textContent = '準備中…';
-    bar.style.width = '5%';
-
-    try {
-      if (typeof MP4Box === 'undefined') throw new Error('MP4Box 未載入，請檢查網路');
-
-      const base = currentFile.name.replace(/\.[^.]+$/, '') || 'clip';
-      const ss   = loopIn.toFixed(3);
-
-      status.textContent = '提取片段…';
-      bar.style.width = '10%';
-
-      const blob = await mp4boxClip(currentFile, loopIn, loopOut,
-        pct => { bar.style.width = Math.round(10 + pct * 85) + '%'; });
-
-      bar.style.width = '100%';
-      status.textContent = '完成！';
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = `${base}_clip_${ss.replace('.', '_')}.mp4`;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 3000);
-      setTimeout(() => overlay.classList.remove('show'), 1500);
-      showToast('剪輯完成');
-      clearPendingClip();
-
-    } catch(err) {
-      const msg = err?.message || String(err) || '未知錯誤';
-      status.textContent = '失敗：' + msg;
-      bar.style.width = '0%';
-      setTimeout(() => overlay.classList.remove('show'), 10000);
-      clearPendingClip();
-    }
-  }).catch(err => {
-    showToast('頂層錯誤：' + (err?.message || String(err)), 8000);
-  });
-});
-
-// ── mp4box.js clip extraction ──
-async function mp4boxClip(file, clipIn, clipOut, onProgress) {
-  const SCAN = Math.min(10 * 1024 * 1024, file.size);
-
-  // 1. Parse track tables with our own parser
-  async function findMoov() {
-    const head = await readFileSlice(file, 0, SCAN);
-    const hv = new DataView(head); let off = 0;
-    while (off + 8 <= head.byteLength) {
-      const sz = readU32(hv, off), nm = read4cc(hv, off + 4);
-      if (sz < 8) break;
-      if (nm === 'moov') return head.slice(off, Math.min(off + sz, head.byteLength));
-      off += sz;
-    }
-    if (file.size > SCAN) {
-      const tail = await readFileSlice(file, file.size - SCAN, file.size);
-      const tv = new DataView(tail);
-      for (let i = 4; i + 8 <= tail.byteLength; i++) {
-        if (read4cc(tv, i) === 'moov') {
-          return tail.slice(i - 4, Math.min(i - 4 + readU32(tv, i - 4), tail.byteLength));
-        }
-      }
-    }
-    return null;
-  }
-
-  const moovBuf = await findMoov();
-  if (!moovBuf) throw new Error('找不到 moov');
-
-  const vt = parseVideoTrackFull(moovBuf);
-  if (!vt || !vt.stco.length) throw new Error('找不到視訊軌');
-  const { timescale, stts, stsc, stco, stsz, stss, fixedSampleSize } = vt;
-  const TC = stco.length;
-
-  function spc(ci) {
-    let r = 1;
-    for (let i = stsc.length - 1; i >= 0; i--)
-      if (ci >= stsc[i].firstChunk - 1) { r = stsc[i].samplesPerChunk; break; }
-    return r;
-  }
-  const css = new Array(TC);
-  { let s = 0; for (let c = 0; c < TC; c++) { css[c] = s; s += spc(c); } }
-  const TS = css[TC-1] + spc(TC-1);
-
-  function time2s(sec) {
-    const tgt = Math.round(sec * timescale); let s = 0, t = 0;
-    for (const e of stts) {
-      if (!e.delta) { s += e.count; continue; }
-      const end = t + e.count * e.delta;
-      if (end > tgt) return s + Math.floor((tgt - t) / e.delta);
-      t = end; s += e.count;
-    }
-    return Math.min(s, TS);
-  }
-  function sSize(si) { return fixedSampleSize > 0 ? fixedSampleSize : (si < stsz.length ? stsz[si] : 0); }
-
-  // Snap start to keyframe
-  let s0 = time2s(clipIn);
-  if (stss.length) {
-    let kf = stss[0];
-    for (const k of stss) { if (k <= s0) kf = k; else break; }
-    s0 = kf;
-  }
-  const s1 = Math.min(TS, time2s(clipOut));
-
-  // Chunk range
-  let c0 = 0;
-  for (let c = 0; c < TC - 1; c++) { if (css[c+1] > s0) break; c0 = c+1; }
-  c0 = Math.min(c0, TC-1);
-  let c1 = c0;
-  for (let c = c0; c < TC; c++) { c1 = c; if (css[c] + spc(c) >= s1) break; }
-
-  const byteStart = stco[c0];
-  let byteEnd = c1 + 1 < TC ? stco[c1+1]
-    : stco[c1] + (() => { let b = 0, n = spc(c1); for (let i = 0; i < n; i++) b += sSize(css[c1]+i); return b; })();
-  byteEnd = Math.min(byteEnd, file.size);
-
-  onProgress && onProgress(0.05);
-
-  // 2. Read moov + clip mdat in parallel
-  const mdatPayload = new Uint8Array(await readFileSlice(file, byteStart, byteEnd));
-  onProgress && onProgress(0.4);
-
-  // 3. Use mp4box to parse moov properly, then extract samples
-  // Feed moov + a synthesized mdat containing only clip bytes
-  const moovU8  = new Uint8Array(moovBuf);
-
-  // Build mdat header
-  const mdatHdr = new Uint8Array(8);
-  mdatHdr[4]=0x6D;mdatHdr[5]=0x64;mdatHdr[6]=0x61;mdatHdr[7]=0x74;
-  const mdatTotalSz = mdatPayload.length + 8;
-  mdatHdr[0]=(mdatTotalSz>>>24)&255;mdatHdr[1]=(mdatTotalSz>>>16)&255;
-  mdatHdr[2]=(mdatTotalSz>>>8)&255;mdatHdr[3]=mdatTotalSz&255;
-
-  // Adjust stco in moov copy so offsets match our new layout
-  // New layout: [moov][mdat]
-  const moovCopy = moovU8.slice();
-  const moovSz   = moovCopy.length;
-  const newMdatStart = moovSz + 8; // moov + mdat header
-  const delta = newMdatStart - byteStart;
-
-  function patchStco(b, s, e) {
-    let off = s;
-    while (off + 8 <= e) {
-      const bsz = (b[off]<<24|b[off+1]<<16|b[off+2]<<8|b[off+3])>>>0;
-      const bnm = String.fromCharCode(b[off+4],b[off+5],b[off+6],b[off+7]);
-      if (bsz < 8) break;
-      const ce = Math.min(off + bsz, e);
-      if (['trak','mdia','minf','stbl'].includes(bnm)) patchStco(b, off+8, ce);
-      else if (bnm === 'stco') {
-        const cnt = (b[off+12]<<24|b[off+13]<<16|b[off+14]<<8|b[off+15])>>>0;
-        for (let i = 0; i < cnt; i++) {
-          const p = off + 16 + i*4;
-          if (p + 4 > b.length) break;
-          const orig = (b[p]<<24|b[p+1]<<16|b[p+2]<<8|b[p+3])>>>0;
-          if (orig >= byteStart && orig < byteEnd) {
-            const v = (orig + delta) >>> 0;
-            b[p]=(v>>>24)&255;b[p+1]=(v>>>16)&255;b[p+2]=(v>>>8)&255;b[p+3]=v&255;
-          }
-        }
-      }
-      off += bsz;
-    }
-  }
-  patchStco(moovCopy, 8, moovCopy.length);
-
-  // 4. Feed synthesized file to mp4box for extraction
-  const samples = await new Promise((resolve, reject) => {
-    const mp4 = MP4Box.createFile();
-    let trackId = null, ts = 1, extracted = [], started = false;
-
-    mp4.onError = e => reject(new Error('mp4box: ' + e));
-    mp4.onReady = info => {
-      const vtrack = info.tracks.find(t => t.type === 'video');
-      if (!vtrack) { reject(new Error('no video track')); return; }
-      trackId = vtrack.id;
-      ts = vtrack.timescale;
-      const inTick  = Math.round(clipIn  * ts);
-      const outTick = Math.round(clipOut * ts);
-      mp4.setExtractionOptions(trackId, null, { nbSamples: 100000 });
-      mp4.start();
-    };
-
-    mp4.onSamples = (tid, user, samps) => {
-      if (tid !== trackId) return;
-      const inTick  = Math.round(clipIn  * ts);
-      const outTick = Math.round(clipOut * ts);
-      for (const s of samps) {
-        if (s.dts >= outTick) { mp4.stop(); resolve(extracted); return; }
-        if (s.dts >= inTick || (!started && s.is_sync && s.dts >= inTick - ts*2)) {
-          started = true; extracted.push(s);
-        }
-      }
-    };
-
-    // Feed moov
-    const moovAB = moovCopy.buffer.slice(0);
-    moovAB.fileStart = 0;
-    mp4.appendBuffer(moovAB);
-
-    // Feed mdat
-    const mdatAB = new ArrayBuffer(8 + mdatPayload.length);
-    new Uint8Array(mdatAB).set(mdatHdr, 0);
-    new Uint8Array(mdatAB).set(mdatPayload, 8);
-    mdatAB.fileStart = moovSz;
-    mp4.appendBuffer(mdatAB);
-    mp4.flush();
-
-    setTimeout(() => { if (!extracted.length) reject(new Error('提取超時')); else resolve(extracted); }, 8000);
-  });
-
-  onProgress && onProgress(0.7);
-  if (!samples.length) throw new Error('沒有提取到 sample');
-
-  // 5. Build output with mp4box
-  const outFile = MP4Box.createFile();
-
-  // Get sample description from first sample
-  const desc = samples[0].description;
-  const firstSampleDTS = samples[0].dts;
-
-  // Detect codec from description
-  const codecBox = desc?.avcC || desc?.hvcC || desc?.av1C;
-  const isHevc = !!desc?.hvcC;
-
-  const trackOpts = {
-    timescale,
-    width:  video.videoWidth,
-    height: video.videoHeight,
-    hdlr:   'vide',
-    name:   'VideoHandler',
-    type:   isHevc ? 'hvc1' : 'avc1',
-    nb_samples: samples.length,
-  };
-
-  if (desc?.avcC?._data)  trackOpts.avcDecoderConfigRecord  = desc.avcC._data;
-  if (desc?.hvcC?._data)  trackOpts.hevcDecoderConfigRecord = desc.hvcC._data;
-
-  const newTid = outFile.addTrack(trackOpts);
-
-  samples.forEach((s, i) => {
-    outFile.addSample(newTid, s.data, {
-      duration: s.duration,
-      dts:      s.dts - firstSampleDTS,
-      cts:      s.cts - samples[0].cts,
-      is_sync:  s.is_sync,
-    });
-    if (onProgress && i % 20 === 0) onProgress(0.7 + (i / samples.length) * 0.28);
-  });
-
-  const ds = new DataStream(undefined, 0, DataStream.BIG_ENDIAN);
-  outFile.write(ds);
-  onProgress && onProgress(1);
-  return new Blob([ds.buffer], { type: 'video/mp4' });
-}
-
-
-function seekExact(t) {
-  return new Promise(resolve => {
-    const clamped = Math.max(0, Math.min(duration - 0.001, t));
-    if (Math.abs(video.currentTime - clamped) < 0.0001) { resolve(); return; }
-    let settled = false;
-    function done() {
-      if (settled) return; settled = true;
-      video.removeEventListener('seeked', onSeeked);
-      resolve();
-    }
-    function onSeeked() { setTimeout(done, 30); }
-    video.addEventListener('seeked', onSeeked);
-    video.currentTime = clamped;
-    setTimeout(done, 2000); // longer timeout for clipped files
-  });
-}
-
-// ── Thumbnails ──
-async function generateThumbnails() {
-  thumbCanvasStrip.innerHTML = '';
-  thumbStatus.style.display = 'block';
-  thumbStatus.textContent = '生成縮圖中…';
-  await new Promise(r => setTimeout(r, 100));
-
-  if (!video.videoWidth || !video.duration) {
-    thumbStatus.style.display = 'none'; return;
-  }
-
-  const W = thumbnailStrip.offsetWidth || 320;
-  const H = thumbnailStrip.offsetHeight || 50;
-  const vw = video.videoWidth || 16;
-  const vh = video.videoHeight || 9;
-  const aspect = vw / vh;
-  const tw = Math.round(H * aspect);
-  const count = Math.max(6, Math.round(W / tw));
-
-  for (let i = 0; i < count; i++) {
-    try {
-      await seekExact((i / count) * duration);
-      const c = document.createElement('canvas');
-      c.width = tw; c.height = H;
-      c.getContext('2d').drawImage(video, 0, 0, tw, H);
-      c.style.cssText = `width:${tw}px;height:${H}px;flex-shrink:0;`;
-      thumbCanvasStrip.appendChild(c);
-    } catch(e) {}
-  }
-
-  thumbStatus.style.display = 'none';
-  try { await seekExact(0); } catch(e) {}
-  updateUI();
-}
-
-// ── Play / Pause ──
-function setPlayIcon(on) {
-  if (on) {
-    playIcon.innerHTML = '<rect x="6" y="4" width="4" height="16" fill="#fff" stroke="#fff"/><rect x="14" y="4" width="4" height="16" fill="#fff" stroke="#fff"/>';
-    playLabel.textContent = '暫停';
-  } else {
-    playIcon.innerHTML = '<polygon fill="#fff" stroke="#fff" points="5 3 19 12 5 21 5 3"/>';
-    playLabel.textContent = '播放';
-  }
-  syncMiniPlayIcon(on);
-}
-
-playBtn.addEventListener('click', e => { e.stopPropagation(); togglePlay(); });
-
-function togglePlay() {
-  if (frameMode) { toggleFrameMode(); hidePanel(); return; }
-  if (currentSpeed === 'frame') { toggleFrameMode(); hidePanel(); return; }
-  if (video.paused) {
-    video.play(); isPlaying = true; setPlayIcon(true); hidePanel();
-  } else {
-    video.pause(); isPlaying = false; setPlayIcon(false); clearTimeout(autoHideTimer);
-  }
-}
-
-// ── Frame mode ──
-function stopFrameMode() {
-  if (frameInterval) { clearInterval(frameInterval); frameInterval = null; }
-  frameMode = false;
-}
-function toggleFrameMode() {
-  if (frameMode) { stopFrameMode(); setPlayIcon(false); return; }
-  video.pause(); isPlaying = false;
-  frameMode = true; setPlayIcon(true);
-  const spf = 1 / fps;
-  frameInterval = setInterval(() => {
-    if (!frameMode) return;
-    const next = video.currentTime + spf;
-    if (next >= duration) { stopFrameMode(); setPlayIcon(false); return; }
-    const done = () => { video.removeEventListener('seeked', done); updateUI(); };
-    video.addEventListener('seeked', done);
-    video.currentTime = next;
-  }, 1000);
-}
-
-video.addEventListener('timeupdate', updateUI);
-video.addEventListener('ended', () => {
-  isPlaying = false; setPlayIcon(false); stopFrameMode(); clearTimeout(autoHideTimer);
-});
-
-// ── Speed buttons ──
-document.querySelectorAll('.speed-btn').forEach(btn => {
-  btn.addEventListener('click', e => {
-    e.stopPropagation();
-    document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    stopFrameMode();
-    const s = btn.dataset.speed;
-    if (s === 'frame') {
-      video.pause(); isPlaying = false; currentSpeed = 'frame'; video.playbackRate = 1;
-      toggleFrameMode();
-    } else {
-      currentSpeed = parseFloat(s);
-      video.playbackRate = currentSpeed;
-      if (!video.paused) setPlayIcon(true);
-    }
-    resetAutoHide();
-  });
-});
-
-// ── ±5s ──
-document.getElementById('back5-btn').addEventListener('click', e => {
-  e.stopPropagation();
-  stopFrameMode(); video.currentTime = Math.max(0, video.currentTime - 5);
-  updateUI(); resetAutoHide();
-});
-document.getElementById('fwd5-btn').addEventListener('click', e => {
-  e.stopPropagation();
-  stopFrameMode(); video.currentTime = Math.min(duration, video.currentTime + 5);
-  updateUI(); resetAutoHide();
-});
-
-// ── Prev / Next frame with long-press ──
-
-function setupLongPress(el, dir) {
-  let pt = null, rt = null;
-  function start(e) {
-    e.preventDefault(); e.stopPropagation();
-    stepFrame(dir);
-    pt = setTimeout(() => { rt = setInterval(() => stepFrame(dir), 80); }, 380);
-  }
-  function stop() { clearTimeout(pt); clearInterval(rt); pt = null; rt = null; }
-  el.addEventListener('touchstart', start, { passive: false });
-  el.addEventListener('touchend', stop);
-  el.addEventListener('touchcancel', stop);
-  el.addEventListener('mousedown', start);
-  el.addEventListener('mouseup', stop);
-  el.addEventListener('mouseleave', stop);
-}
-setupLongPress(document.getElementById('prev-frame-btn'), -1);
-setupLongPress(document.getElementById('next-frame-btn'), +1);
-// Wire mini frame buttons with same long-press
-setupLongPress(document.getElementById('mini-prev'), -1);
-setupLongPress(document.getElementById('mini-next'), +1);
-
-// ── Timeline scrub ──
-
-function scrubAt(cx, commit) {
-  const r = thumbnailStrip.getBoundingClientRect();
-  scrubTargetTime = Math.max(0, Math.min(1, (cx - r.left) / r.width)) * duration;
-  if (commit) {
-    seekExact(scrubTargetTime).then(() => updateUI());
-  } else {
-    if (!scrubRaf) {
-      scrubRaf = requestAnimationFrame(() => {
-        scrubRaf = null;
-        const pct = scrubTargetTime / duration;
-        const indicator = document.getElementById('timeline-indicator');
-        if (indicator) indicator.style.left = (pct * 100) + '%';
-        if (timeDisplay) timeDisplay.textContent = formatTime(scrubTargetTime);
-        const f = Math.round(scrubTargetTime * fps);
-        if (frameDisplay) frameDisplay.textContent = `F: ${f}`;
-      });
-    }
-  }
-}
-
-thumbnailStrip.addEventListener('touchstart', e => {
-  e.stopPropagation(); isScrubbing = true;
-  stopFrameMode(); video.pause(); isPlaying = false; setPlayIcon(false);
-  scrubAt(e.touches[0].clientX, false);
-}, { passive: false });
-thumbnailStrip.addEventListener('touchmove', e => {
-  if (!isScrubbing) return;
-  e.preventDefault(); e.stopPropagation();
-  scrubAt(e.touches[0].clientX, false);
-}, { passive: false });
-thumbnailStrip.addEventListener('touchend', e => {
-  if (!isScrubbing) return;
-  isScrubbing = false;
-  scrubAt(e.changedTouches[0].clientX, true); // seek only on release
-});
-thumbnailStrip.addEventListener('touchcancel', () => {
-  isScrubbing = false;
-  video.currentTime = scrubTargetTime;
-  updateUI();
-});
-thumbnailStrip.addEventListener('mousedown', e => {
-  e.stopPropagation(); isScrubbing = true;
-  stopFrameMode(); video.pause(); isPlaying = false; setPlayIcon(false);
-  scrubAt(e.clientX, false);
-});
-document.addEventListener('mousemove', e => { if (isScrubbing) scrubAt(e.clientX, false); });
-document.addEventListener('mouseup', e => {
-  if (!isScrubbing) return;
-  isScrubbing = false;
-  scrubAt(e.clientX, true);
-});
-
-// ── Progress bar scrub ──
-function scrubProg(cx) {
-  const r = progressWrap.getBoundingClientRect();
-  video.currentTime = Math.max(0, Math.min(1, (cx - r.left) / r.width)) * duration;
-  updateUI();
-}
-progressWrap.addEventListener('touchstart', e => {
-  e.stopPropagation(); scrubProg(e.touches[0].clientX);
-  stopFrameMode(); video.pause(); isPlaying = false; setPlayIcon(false);
-}, { passive: true });
-progressWrap.addEventListener('touchmove', e => scrubProg(e.touches[0].clientX), { passive: true });
-progressWrap.addEventListener('mousedown', e => { e.stopPropagation(); scrubProg(e.clientX); });
-
-// ── Loop range ──
-
-function updateLoopOverlay() {
-  if (loopIn !== null && loopOut !== null && duration > 0) {
-    const l = (loopIn / duration) * 100;
-    const w = ((loopOut - loopIn) / duration) * 100;
-    loopRangeOverlay.style.left  = l + '%';
-    loopRangeOverlay.style.width = w + '%';
-    loopRangeOverlay.classList.add('show');
-    loopRangeDisplay.textContent = `${formatTime(loopIn)} → ${formatTime(loopOut)}`;
-  } else {
-    loopRangeOverlay.classList.remove('show');
-    loopRangeDisplay.textContent = '—';
-  }
-}
-
-loopSetInBtn.addEventListener('click', e => {
-  e.stopPropagation();
-  loopIn = video.currentTime;
-  if (loopOut !== null && loopIn >= loopOut) loopOut = null;
-  loopSetInBtn.classList.add('set');
-  loopSetOutBtn.classList.toggle('set', loopOut !== null);
-  updateLoopOverlay();
-  showToast(`IN: ${formatTime(loopIn)}`);
-  resetAutoHide();
-});
-
-loopSetOutBtn.addEventListener('click', e => {
-  e.stopPropagation();
-  loopOut = video.currentTime;
-  if (loopIn !== null && loopOut <= loopIn) loopIn = null;
-  loopSetOutBtn.classList.add('set');
-  loopSetInBtn.classList.toggle('set', loopIn !== null);
-  updateLoopOverlay();
-  showToast(`OUT: ${formatTime(loopOut)}`);
-  resetAutoHide();
-});
-
-loopToggleBtn.addEventListener('click', e => {
-  e.stopPropagation();
-  if (loopIn === null || loopOut === null) {
-    showToast('請先設定 IN / OUT'); resetAutoHide(); return;
-  }
-  loopActive = !loopActive;
-  loopToggleBtn.classList.toggle('active', loopActive);
-  if (loopActive) {
-    video.currentTime = loopIn;
-    if (video.paused) togglePlay();
-    showToast('循環播放開啟');
-  } else {
-    showToast('循環播放關閉');
-  }
-  resetAutoHide();
-});
-
-document.getElementById('loop-clear').addEventListener('click', e => {
-  e.stopPropagation();
-  resetLoop();
-  showToast('已清除範圍');
-  resetAutoHide();
-});
-
-// Monitor loop: jump back to IN when OUT is reached
-video.addEventListener('timeupdate', () => {
-  if (loopActive && loopOut !== null && video.currentTime >= loopOut) {
-    video.currentTime = loopIn;
-  }
-});
-
-// Reset loop when loading new file
-function resetLoop() {
-  loopIn = null; loopOut = null; loopActive = false;
-  loopToggleBtn.classList.remove('active');
-  loopSetInBtn.classList.remove('set');
-  loopSetOutBtn.classList.remove('set');
-  updateLoopOverlay();
-}
-
-// ── Save frame PNG ──
-document.getElementById('save-btn').addEventListener('click', e => {
-  e.stopPropagation();
-  video.pause(); isPlaying = false; setPlayIcon(false);
-  const w = video.videoWidth, h = video.videoHeight;
-  hiddenCanvas.width = w; hiddenCanvas.height = h;
-  const ctx = hiddenCanvas.getContext('2d');
-  ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(video, 0, 0, w, h);
-  const frame = Math.round(video.currentTime * fps);
-  const tc = formatTime(video.currentTime).replace(/[:.]/g, '_');
-  hiddenCanvas.toBlob(blob => {
-    if (!blob) { showToast('截圖失敗'); return; }
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `frame_${String(frame).padStart(6,'0')}_${tc}.png`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
-    showToast(`已儲存 Frame ${frame}（PNG）`);
-  }, 'image/png');
-  resetAutoHide();
-});
-
-// Prevent control taps from toggling play
-controls.addEventListener('click', e => e.stopPropagation());
-
-// ── Wake Lock: keep screen on while video is loaded ──
-
-async function requestWakeLock() {
-  if (!('wakeLock' in navigator)) return;
-  try {
-    wakeLock = await navigator.wakeLock.request('screen');
-  } catch(e) {}
-}
-
-async function releaseWakeLock() {
-  if (wakeLock) { try { await wakeLock.release(); } catch(e) {} wakeLock = null; }
-}
-
-// Re-acquire after tab becomes visible again (iOS releases it on background)
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && playerScreen.style.display !== 'none') {
-    requestWakeLock();
-  }
-});
-
-// ── Export clip (FFmpeg.wasm) ──
-
-// ── Pending clip persistence ──
-function savePendingClip() {
-  if (loopIn === null || loopOut === null || !currentFile) return;
-  try {
-    localStorage.setItem('pendingClip', JSON.stringify({
-      loopIn, loopOut,
-      fileName: currentFile.name,
-      fileSize: currentFile.size,
-      format: document.getElementById('export-format')?.value || 'original',
-      crashCount: (JSON.parse(localStorage.getItem('pendingClip') || '{}').crashCount || 0) + 1,
-    }));
-  } catch(e) {}
-}
-function clearPendingClip() {
-  try { localStorage.removeItem('pendingClip'); } catch(e) {}
-}
-
-document.getElementById('loop-export').addEventListener('click', e => {
-  e.stopPropagation();
-  showToast('按下剪輯', 3000);
-
-  Promise.resolve().then(async () => {
-    if (loopIn === null || loopOut === null) { showToast('請先設定 IN / OUT', 4000); return; }
-    if (!currentFile) { showToast('沒有影片檔案', 4000); return; }
-
-    savePendingClip();
-    const overlay = document.getElementById('export-overlay');
-    const status  = document.getElementById('export-status');
-    const bar     = document.getElementById('export-progress-fill');
-
-    if (!overlay) { showToast('找不到 overlay 元素', 6000); return; }
-
-    overlay.classList.add('show');
-    status.textContent = '準備中…';
-    bar.style.width = '5%';
-
-    try {
-      if (typeof MP4Box === 'undefined') throw new Error('MP4Box 未載入，請檢查網路');
-
-      const base = currentFile.name.replace(/\.[^.]+$/, '') || 'clip';
-      const ss   = loopIn.toFixed(3);
-
-      status.textContent = '提取片段…';
-      bar.style.width = '10%';
-
-      const blob = await mp4boxClip(currentFile, loopIn, loopOut,
-        pct => { bar.style.width = Math.round(10 + pct * 85) + '%'; });
-
-      bar.style.width = '100%';
-      status.textContent = '完成！';
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = `${base}_clip_${ss.replace('.', '_')}.mp4`;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 3000);
-      setTimeout(() => overlay.classList.remove('show'), 1500);
-      showToast('剪輯完成');
-      clearPendingClip();
-
-    } catch(err) {
-      const msg = err?.message || String(err) || '未知錯誤';
-      status.textContent = '失敗：' + msg;
-      bar.style.width = '0%';
-      setTimeout(() => overlay.classList.remove('show'), 10000);
-      clearPendingClip();
-    }
-  }).catch(err => {
-    showToast('頂層錯誤：' + (err?.message || String(err)), 8000);
-  });
-});
-
-// ── mp4box.js clip extraction ──
-async function mp4boxClip(file, clipIn, clipOut, onProgress) {
-  showToast('mp4boxClip 開始', 4000);
-  const SCAN = Math.min(10 * 1024 * 1024, file.size);
-
-  // 1. Feed head to mp4box to get moov info
-  const mp4info = await new Promise(async (resolve, reject) => {
+  // 2. Use mp4box.js to parse moov info
+  const mp4info = await new Promise((resolve, reject) => {
     const mp4 = MP4Box.createFile();
     mp4.onError = e => reject(new Error('解析失敗: ' + e));
-    mp4.onReady = info => { showToast('mp4box onReady OK', 3000); resolve({ info, file: mp4 }); };
-
-    showToast('讀取頭部…', 3000);
-    const headBuf = await readFileSlice(file, 0, SCAN);
-    headBuf.fileStart = 0;
-    mp4.appendBuffer(headBuf);
+    mp4.onReady = info => resolve({ info, mp4 });
+    const ab = moovBytes.buffer.slice(moovBytes.byteOffset, moovBytes.byteOffset + moovBytes.byteLength);
+    // Feed a minimal file: just moov (fileStart=0 won't work, use ftyp+moov trick)
+    const buf = new ArrayBuffer(moovBytes.length);
+    new Uint8Array(buf).set(moovBytes);
+    buf.fileStart = 0;
+    mp4.appendBuffer(buf);
     mp4.flush();
-
-    setTimeout(async () => {
-      if (file.size > SCAN) {
-        showToast('讀取尾部…', 3000);
-        const tailBuf = await readFileSlice(file, file.size - SCAN, file.size);
-        tailBuf.fileStart = file.size - SCAN;
-        mp4.appendBuffer(tailBuf);
-        mp4.flush();
-      }
-    }, 300);
-
-    setTimeout(() => reject(new Error('mp4box 解析超時')), 10000);
+    setTimeout(() => reject(new Error('解析超時')), 5000);
   });
 
-  const { info, file: mp4file } = mp4info;
-  const vt = info.tracks.find(t => t.type === 'video');
+  const vt = mp4info.info.tracks.find(t => t.type === 'video');
+  const at = mp4info.info.tracks.find(t => t.type === 'audio');
   if (!vt) throw new Error('找不到視訊軌');
 
-  // 2. Scan head AND tail for avcC/hvcC
-  let decoderConfig = null;
-  let trackType = 'avc1';
+  const timescale = vt.timescale;
 
-  async function scanForCodec(buf) {
-    for (let i = 4; i + 8 <= buf.length; i++) {
-      const nm = String.fromCharCode(buf[i],buf[i+1],buf[i+2],buf[i+3]);
-      if (nm === 'avcC' || nm === 'hvcC') {
-        const sz = (buf[i-4]<<24|buf[i-3]<<16|buf[i-2]<<8|buf[i-1])>>>0;
-        if (sz >= 8) {
-          decoderConfig = buf.slice(i + 4, i - 4 + sz).buffer;
-          trackType = nm === 'hvcC' ? 'hvc1' : 'avc1';
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
-  const headBuf2 = new Uint8Array(await readFileSlice(file, 0, SCAN));
-  if (!await scanForCodec(headBuf2) && file.size > SCAN) {
-    const tailBuf2 = new Uint8Array(await readFileSlice(file, file.size - SCAN, file.size));
-    await scanForCodec(tailBuf2);
-  }
-
-  // 3. Use our binary parser to get sample positions
-  const pVt = parseVideoTrackFull(
-    await (async () => {
-      const SCAN2 = Math.min(10 * 1024 * 1024, file.size);
-      const headBuf = await readFileSlice(file, 0, SCAN2);
-      let moovBuf = null;
-      const v = new DataView(headBuf);
-      let off = 0;
-      while (off + 8 <= headBuf.byteLength) {
-        const sz = readU32(v, off), nm = read4cc(v, off + 4);
+  // 3. Parse raw tables from moov bytes
+  function parseTrack(trackId) {
+    let stts=[], stsc=[], stco=[], stsz=[], stss=[], ctts=[], fixedSz=0, ts=null, isVideo=false, isAudio=false;
+    function walk(b, s, e) {
+      let off = s;
+      while (off+8 <= e) {
+        const sz = u32(b,off);
+        const nm = String.fromCharCode(b[off+4],b[off+5],b[off+6],b[off+7]);
         if (sz < 8) break;
-        if (nm === 'moov') { moovBuf = headBuf.slice(off, Math.min(off + sz, headBuf.byteLength)); break; }
+        const cs=off+8, ce=Math.min(off+sz,e);
+        if (['trak','mdia','minf','stbl','edts'].includes(nm)) walk(b,cs,ce);
+        else if (nm==='tkhd') {
+          // get track id from tkhd
+          const ver = b[cs];
+          const tid = u32(b, cs + (ver===1?20:12));
+          if (tid !== trackId) { off+=sz; return; } // wrong track
+        }
+        else if (nm==='mdhd') { const ver=b[cs]; ts=u32(b,cs+(ver===1?20:12)); }
+        else if (nm==='hdlr') {
+          const ht = String.fromCharCode(b[cs+8],b[cs+9],b[cs+10],b[cs+11]);
+          isVideo = ht==='vide'; isAudio = ht==='soun';
+        }
+        else if (nm==='stts') { const cnt=u32(b,cs+4); for(let i=0;i<cnt;i++) stts.push({count:u32(b,cs+8+i*8),delta:u32(b,cs+8+i*8+4)}); }
+        else if (nm==='stsc') { const cnt=u32(b,cs+4); for(let i=0;i<cnt;i++) stsc.push({firstChunk:u32(b,cs+8+i*12),samplesPerChunk:u32(b,cs+8+i*12+4)}); }
+        else if (nm==='stco') { const cnt=u32(b,cs+4); for(let i=0;i<cnt;i++) stco.push(u32(b,cs+8+i*4)); }
+        else if (nm==='co64') { const cnt=u32(b,cs+4); for(let i=0;i<cnt;i++) stco.push(u32(b,cs+8+i*8)*0x100000000+u32(b,cs+8+i*8+4)); }
+        else if (nm==='stsz') { fixedSz=u32(b,cs+4); if(!fixedSz){const cnt=u32(b,cs+8);for(let i=0;i<cnt;i++)stsz.push(u32(b,cs+12+i*4));} }
+        else if (nm==='stss') { const cnt=u32(b,cs+4); for(let i=0;i<cnt;i++) stss.push(u32(b,cs+8+i*4)-1); }
+        else if (nm==='ctts') { const cnt=u32(b,cs+4); for(let i=0;i<cnt;i++) ctts.push({count:u32(b,cs+8+i*8),offset:(new DataView(b.buffer||new Uint8Array(b).buffer,b.byteOffset||0)).getInt32(cs+8+i*8+4,false)}); }
         off += sz;
       }
-      if (!moovBuf && file.size > SCAN2) {
-        const tail = await readFileSlice(file, file.size - SCAN2, file.size);
-        const tv = new DataView(tail);
-        for (let i = 4; i + 8 <= tail.byteLength; i++) {
-          if (read4cc(tv, i) === 'moov') {
-            moovBuf = tail.slice(i - 4, Math.min(i - 4 + readU32(tv, i - 4), tail.byteLength)); break;
-          }
-        }
-      }
-      return moovBuf;
-    })()
-  );
-  if (!pVt) throw new Error('無法解析視訊軌');
-
-  const { timescale, stts, stsc, stco, stsz, stss, ctts, fixedSampleSize } = pVt;
-  const TC = stco.length;
-
-  function spc(ci) {
-    let r = 1;
-    for (let i = stsc.length - 1; i >= 0; i--)
-      if (ci >= stsc[i].firstChunk - 1) { r = stsc[i].samplesPerChunk; break; }
-    return r;
-  }
-  const css = new Array(TC);
-  { let s = 0; for (let c = 0; c < TC; c++) { css[c] = s; s += spc(c); } }
-  const TS = css[TC-1] + spc(TC-1);
-
-  function time2s(sec) {
-    const tgt = Math.round(sec * timescale); let s = 0, t = 0;
-    for (const e of stts) {
-      if (!e.delta) { s += e.count; continue; }
-      const end = t + e.count * e.delta;
-      if (end > tgt) return s + Math.floor((tgt - t) / e.delta);
-      t = end; s += e.count;
     }
-    return Math.min(s, TS);
+    walk(moovBytes, 8, moovBytes.length);
+    return { stts, stsc, stco, stsz, stss, ctts, fixedSz, timescale: ts };
   }
-  function sSize(si) { return fixedSampleSize > 0 ? fixedSampleSize : (si < stsz.length ? stsz[si] : 0); }
 
-  // Snap start to keyframe
-  let s0 = time2s(clipIn);
-  if (stss.length) {
-    let kf = stss[0];
-    for (const k of stss) { if (k <= s0) kf = k; else break; }
-    s0 = kf;
-  }
-  const s1 = Math.min(TS, time2s(clipOut));
+  const vTrack = parseTrack(vt.id);
+  const aTrack = at ? parseTrack(at.id) : null;
 
-  // Build DTS table
-  const dtsArr = new Float64Array(s1);
-  { let t = 0, si = 0; for (const e of stts) { for (let i = 0; i < e.count && si < s1; i++) { dtsArr[si++] = t; t += e.delta; } } }
-
-  // ctts lookup
-  const ctsOffset = new Int32Array(s1);
-  if (ctts && ctts.length) {
-    let si = 0;
-    for (const e of ctts) {
-      for (let i = 0; i < e.count && si < s1; i++) ctsOffset[si++] = e.offset;
+  // 4. Helper: get sample positions
+  function buildSamples(track, clipInSec, clipOutSec) {
+    const { stts, stsc, stco, stsz, stss, ctts, fixedSz, timescale: ts } = track;
+    if (!stco.length) return [];
+    const TC = stco.length;
+    function spc(ci) { let r=1; for(let i=stsc.length-1;i>=0;i--) if(ci>=stsc[i].firstChunk-1){r=stsc[i].samplesPerChunk;break;} return r; }
+    const css=[]; { let s=0; for(let c=0;c<TC;c++){css.push(s);s+=spc(c);} }
+    const TS = css[TC-1]+spc(TC-1);
+    function time2s(sec) {
+      const tgt=Math.round(sec*ts); let s=0,t=0;
+      for(const e of stts){if(!e.delta){s+=e.count;continue;} const end=t+e.count*e.delta; if(end>tgt)return s+Math.floor((tgt-t)/e.delta); t=end;s+=e.count;}
+      return Math.min(s,TS);
     }
+    function ssz(si){return fixedSz>0?fixedSz:(si<stsz.length?stsz[si]:0);}
+    // Build DTS array
+    const dts=[]; { let t=0; for(const e of stts){for(let i=0;i<e.count;i++){dts.push(t);t+=e.delta;}} }
+    // ctts
+    const cts=new Array(dts.length).fill(0);
+    { let si=0; for(const e of ctts){for(let i=0;i<e.count&&si<dts.length;i++)cts[si++]=e.offset;} }
+    // Snap start to keyframe for video
+    let s0=time2s(clipInSec);
+    if(stss.length){let kf=stss[0];for(const k of stss){if(k<=s0)kf=k;else break;}s0=kf;}
+    const s1=Math.min(TS,time2s(clipOutSec));
+    // Build sample list
+    const stssSet=new Set(stss);
+    const result=[];
+    for(let si=s0;si<s1;si++){
+      let c=0; for(let cc=0;cc<TC-1;cc++){if(css[cc+1]>si)break;c=cc+1;} c=Math.min(c,TC-1);
+      let bo=stco[c]; for(let j=css[c];j<si;j++)bo+=ssz(j);
+      const dur=si+1<dts.length?dts[si+1]-dts[si]:(stts.length?stts[stts.length-1].delta:1);
+      result.push({byteOff:bo,sz:ssz(si),dts:dts[si],cts:cts[si],dur,isSync:stssSet.size===0||stssSet.has(si)});
+    }
+    return result;
   }
 
-  const stssSet = new Set(stss);
+  const vSamples = buildSamples(vTrack, clipIn, clipOut);
+  const aSamples = aTrack ? buildSamples(aTrack, clipIn, clipOut) : [];
+  if (!vSamples.length) throw new Error('沒有找到視訊 sample');
 
-  // 4. Collect sample metadata (byte positions)
-  const sampleMeta = [];
-  for (let si = s0; si < s1; si++) {
-    // Find chunk and offset within chunk
-    let chunk = 0;
-    for (let c = 0; c < TC - 1; c++) { if (css[c+1] > si) break; chunk = c + 1; }
-    chunk = Math.min(chunk, TC - 1);
-    let byteOff = stco[chunk];
-    for (let j = css[chunk]; j < si; j++) byteOff += sSize(j);
-    sampleMeta.push({
-      byteOff, sz: sSize(si),
-      dts: dtsArr[si] - dtsArr[s0],
-      cts: (dtsArr[si] + ctsOffset[si]) - (dtsArr[s0] + ctsOffset[s0]),
-      dur: si + 1 < s1 ? dtsArr[si+1] - dtsArr[si] : (stts.length ? stts[stts.length-1].delta : 1),
-      isSync: stssSet.size === 0 || stssSet.has(si),
-    });
-  }
-
-  // 5. Read all sample bytes in one contiguous read
-  const byteStart = sampleMeta[0].byteOff;
-  const byteEnd   = Math.min(sampleMeta[sampleMeta.length-1].byteOff + sampleMeta[sampleMeta.length-1].sz, file.size);
   onProgress && onProgress(0.1);
-  const rawBuf = new Uint8Array(await readFileSlice(file, byteStart, byteEnd));
+
+  // 5. Read video bytes
+  const vStart = vSamples[0].byteOff;
+  const vEnd   = Math.min(vSamples[vSamples.length-1].byteOff + vSamples[vSamples.length-1].sz, file.size);
+  const vBuf   = new Uint8Array(await readFileSlice(file, vStart, vEnd));
+
+  // 6. Read audio bytes
+  let aBuf = null, aStart = 0;
+  if (aSamples.length) {
+    aStart = aSamples[0].byteOff;
+    const aEnd = Math.min(aSamples[aSamples.length-1].byteOff + aSamples[aSamples.length-1].sz, file.size);
+    aBuf = new Uint8Array(await readFileSlice(file, aStart, aEnd));
+  }
+
   onProgress && onProgress(0.5);
 
-  // 6. Build output with mp4box.js
-  // 6. Find stsd box in original moov (copy it entirely for codec correctness)
-  const moovU8 = await (async () => {
-    const h = new Uint8Array(await readFileSlice(file, 0, SCAN));
-    for (let i = 4; i + 8 <= h.length; i++) {
-      if (String.fromCharCode(h[i],h[i+1],h[i+2],h[i+3]) === 'moov') {
-        const sz = (h[i-4]<<24|h[i-3]<<16|h[i-2]<<8|h[i-1])>>>0;
-        return h.slice(i - 4, Math.min(i - 4 + sz, h.length));
-      }
-    }
-    if (file.size > SCAN) {
-      const t = new Uint8Array(await readFileSlice(file, file.size - SCAN, file.size));
-      for (let i = 4; i + 8 <= t.length; i++) {
-        if (String.fromCharCode(t[i],t[i+1],t[i+2],t[i+3]) === 'moov') {
-          const sz = (t[i-4]<<24|t[i-3]<<16|t[i-2]<<8|t[i-1])>>>0;
-          return t.slice(i - 4, Math.min(i - 4 + sz, t.length));
-        }
+  // 7. Find stsd boxes for video and audio
+  function findStsd(b, targetTkhd) {
+    // Find stsd belonging to the right track by checking tkhd track id
+    // Simple: scan all stsd boxes and return all, let mp4box pick
+    for(let i=4;i+8<=b.length;i++){
+      if(String.fromCharCode(b[i],b[i+1],b[i+2],b[i+3])==='stsd'){
+        const sz=u32(b,i-4); return b.slice(i-4,i-4+sz);
       }
     }
     return null;
-  })();
-
-  let stsdBox = null;
-  if (moovU8) {
-    for (let i = 4; i + 8 <= moovU8.length; i++) {
-      if (String.fromCharCode(moovU8[i],moovU8[i+1],moovU8[i+2],moovU8[i+3]) === 'stsd') {
-        const sz = (moovU8[i-4]<<24|moovU8[i-3]<<16|moovU8[i-2]<<8|moovU8[i-1])>>>0;
-        stsdBox = moovU8.slice(i - 4, i - 4 + sz);
-        break;
-      }
-    }
   }
 
+  // Better: find stsd per track by walking moov/trak
+  function findTrackStsd(trackId) {
+    const b = moovBytes; let off=8;
+    while(off+8<=b.length){
+      const sz=u32(b,off),nm=String.fromCharCode(b[off+4],b[off+5],b[off+6],b[off+7]);
+      if(sz<8)break;
+      if(nm==='trak'){
+        // check if this trak has the right track id
+        let tid=null, stsdBox=null;
+        function walkTrak(s,e){
+          let o=s;
+          while(o+8<=e){
+            const tsz=u32(b,o),tnm=String.fromCharCode(b[o+4],b[o+5],b[o+6],b[o+7]);
+            if(tsz<8)break;
+            const ce=Math.min(o+tsz,e);
+            if(['mdia','minf','stbl'].includes(tnm))walkTrak(o+8,ce);
+            else if(tnm==='tkhd'){const ver=b[o+8];tid=u32(b,o+8+(ver===1?20:12));}
+            else if(tnm==='stsd'){stsdBox=b.slice(o,ce);}
+            o+=tsz;
+          }
+        }
+        walkTrak(off+8,Math.min(off+sz,b.length));
+        if(tid===trackId&&stsdBox)return stsdBox;
+      }
+      off+=sz;
+    }
+    return null;
+  }
+
+  const vStsd = findTrackStsd(vt.id);
+  const aStsd = at ? findTrackStsd(at.id) : null;
+
+  // 8. Build output with mp4box
   const outFile = MP4Box.createFile();
-  const trackOpts = {
-    timescale,
+  const vDTSStart = vSamples[0].dts;
+  const aDTSStart = aSamples.length ? aSamples[0].dts : 0;
+
+  // Video track
+  const vTrackOpts = {
+    timescale: vTrack.timescale || timescale,
     width:  vt.video.width,
     height: vt.video.height,
     hdlr:   'vide',
     name:   'VideoHandler',
-    type:   trackType,
+    type:   'avc1', // will be patched by stsd replacement
   };
-  if (decoderConfig) {
-    if (trackType === 'avc1') trackOpts.avcDecoderConfigRecord = decoderConfig;
-    else trackOpts.hevcDecoderConfigRecord = decoderConfig;
+  if (vStsd) {
+    // Detect codec from stsd
+    const codecNm = String.fromCharCode(vStsd[12],vStsd[13],vStsd[14],vStsd[15]);
+    if(codecNm==='hvc1'||codecNm==='hev1')vTrackOpts.type='hvc1';
+    else if(codecNm==='av01')vTrackOpts.type='av01';
   }
+  const vTid = outFile.addTrack(vTrackOpts);
 
-  const newTid = outFile.addTrack(trackOpts);
-
-  sampleMeta.forEach((s, i) => {
-    const data = rawBuf.slice(s.byteOff - byteStart, s.byteOff - byteStart + s.sz);
-    outFile.addSample(newTid, data.buffer, {
+  vSamples.forEach((s,i)=>{
+    const data = vBuf.slice(s.byteOff-vStart, s.byteOff-vStart+s.sz);
+    outFile.addSample(vTid, data.buffer, {
       duration: s.dur,
-      dts:      s.dts,
-      cts:      s.cts,
-      is_sync:  s.isSync,
+      dts: s.dts - vDTSStart,
+      cts: s.dts - vDTSStart + s.cts,
+      is_sync: s.isSync,
     });
-    if (onProgress && i % 30 === 0) onProgress(0.5 + (i / sampleMeta.length) * 0.45);
+    if(onProgress&&i%30===0)onProgress(0.5+i/vSamples.length*0.35);
   });
 
-  // Write output and patch stsd with original (contains correct hvcC/avcC)
+  // Audio track
+  let aTid = null;
+  if (aSamples.length && aBuf && at) {
+    const aTs = aTrack.timescale || at.audio?.sample_rate || 44100;
+    const aTrackOpts = {
+      timescale: aTs,
+      samplerate: at.audio?.sample_rate || 44100,
+      channel_count: at.audio?.channel_count || 2,
+      hdlr: 'soun',
+      name: 'SoundHandler',
+      type: 'mp4a',
+    };
+    aTid = outFile.addTrack(aTrackOpts);
+    aSamples.forEach(s=>{
+      const data = aBuf.slice(s.byteOff-aStart, s.byteOff-aStart+s.sz);
+      outFile.addSample(aTid, data.buffer, {
+        duration: s.dur,
+        dts: s.dts - aDTSStart,
+        cts: s.dts - aDTSStart + s.cts,
+        is_sync: s.isSync,
+      });
+    });
+  }
+
+  // 9. Write and patch stsd boxes
   const ds = new DataStream(undefined, 0, DataStream.BIG_ENDIAN);
   outFile.write(ds);
   let finalBuf = new Uint8Array(ds.buffer);
 
-  if (stsdBox) {
-    for (let i = 4; i + 8 <= finalBuf.length; i++) {
-      if (String.fromCharCode(finalBuf[i],finalBuf[i+1],finalBuf[i+2],finalBuf[i+3]) === 'stsd') {
-        const outSz = (finalBuf[i-4]<<24|finalBuf[i-3]<<16|finalBuf[i-2]<<8|finalBuf[i-1])>>>0;
-        const diff  = stsdBox.length - outSz;
-        const before = finalBuf.slice(0, i - 4);
-        const after  = finalBuf.slice(i - 4 + outSz);
-        const merged = new Uint8Array(before.length + stsdBox.length + after.length);
-        merged.set(before, 0);
-        merged.set(stsdBox, before.length);
-        merged.set(after, before.length + stsdBox.length);
-
-        // Fix all ancestor box sizes if stsd size changed
-        if (diff !== 0) {
-          const ancestors = ['stbl','minf','mdia','trak','moov'];
-          for (let j = 4; j + 8 <= merged.length; j++) {
-            const nm = String.fromCharCode(merged[j],merged[j+1],merged[j+2],merged[j+3]);
-            if (ancestors.includes(nm)) {
-              const oldSz = (merged[j-4]<<24|merged[j-3]<<16|merged[j-2]<<8|merged[j-1])>>>0;
-              const newSz = (oldSz + diff) >>> 0;
-              merged[j-4]=(newSz>>>24)&255; merged[j-3]=(newSz>>>16)&255;
-              merged[j-2]=(newSz>>>8)&255;  merged[j-1]=newSz&255;
+  function patchStsd(buf, trackIdx, stsdBox) {
+    // Find the Nth stsd box and replace it
+    let count = 0;
+    for(let i=4;i+8<=buf.length;i++){
+      if(String.fromCharCode(buf[i],buf[i+1],buf[i+2],buf[i+3])==='stsd'){
+        if(count===trackIdx){
+          const outSz=u32(buf,i-4), diff=stsdBox.length-outSz;
+          const before=buf.slice(0,i-4), after=buf.slice(i-4+outSz);
+          const merged=new Uint8Array(before.length+stsdBox.length+after.length);
+          merged.set(before,0); merged.set(stsdBox,before.length); merged.set(after,before.length+stsdBox.length);
+          // Fix ancestor sizes
+          if(diff!==0){
+            const ancestors=['stbl','minf','mdia','trak','moov'];
+            for(let j=4;j+8<=merged.length;j++){
+              const nm=String.fromCharCode(merged[j],merged[j+1],merged[j+2],merged[j+3]);
+              if(ancestors.includes(nm)){
+                const oldSz=u32(merged,j-4),newSz=(oldSz+diff)>>>0;
+                w32(merged,j-4,newSz);
+              }
             }
           }
+          return merged;
         }
-        finalBuf = merged;
-        break;
+        count++;
       }
     }
+    return buf;
   }
+
+  if (vStsd) finalBuf = patchStsd(finalBuf, 0, vStsd);
+  if (aStsd && aTid !== null) finalBuf = patchStsd(finalBuf, 1, aStsd);
 
   onProgress && onProgress(1);
   return new Blob([finalBuf.buffer], { type: 'video/mp4' });
 }
+  e.stopPropagation();
 
+  if (loopIn === null || loopOut === null) {
+    showToast('請先設定 IN / OUT'); return;
+  }
+  if (!currentFile) { showToast('沒有影片檔案'); return; }
 
+  exportCancelled = false;
+  exportOverlay.classList.add('show');
+  exportStatus.textContent = '準備中…';
+  exportProgressF.style.width = '0%';
+
+  try {
+    const { createFFmpeg, fetchFile } = FFmpeg;
+
+    if (!ffmpegInstance) {
+      ffmpegInstance = createFFmpeg({
+        log: false,
+        corePath: window.location.origin + '/ffmpeg/ffmpeg-core.js',
+      });
+    }
+
+    if (!ffmpegLoaded) {
+      exportStatus.textContent = '載入 FFmpeg…（首次約需 30 秒）';
+      await ffmpegInstance.load();
+      ffmpegLoaded = true;
+    }
+
+    if (exportCancelled) { exportOverlay.classList.remove('show'); return; }
+
+    ffmpegInstance.setProgress(({ ratio }) => {
+      if (ratio >= 0) exportProgressF.style.width = Math.min(95, Math.round(ratio * 100)) + '%';
+    });
+
+    exportStatus.textContent = '寫入檔案…';
+    exportProgressF.style.width = '5%';
+
+    const ext = currentFile.name.split('.').pop() || 'mp4';
+    const inName = 'input.' + ext;
+    ffmpegInstance.FS('writeFile', inName, await fetchFile(currentFile));
+
+    if (exportCancelled) { exportOverlay.classList.remove('show'); return; }
+
+    exportStatus.textContent = '剪輯中…';
+    exportProgressF.style.width = '10%';
+
+    const ss  = loopIn.toFixed(3);
+    const dur = (loopOut - loopIn).toFixed(3);
+    const formatSel = document.getElementById('export-format').value;
+    const srcExt = ext.toLowerCase();
+    const outExt = formatSel === 'original' ? srcExt
+                 : formatSel;
+    const outName = 'clip.' + outExt;
+    const needsReencode = outExt !== srcExt;
+
+    if (needsReencode) {
+      // Format conversion + clip: re-encode
+      await ffmpegInstance.run(
+        '-ss', ss,
+        '-i', inName,
+        '-t', dur,
+        '-map', '0:v:0',
+        '-map', '0:a:0?',
+        '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '18',
+        '-c:a', 'aac', '-b:a', '128k',
+        '-movflags', '+faststart',
+        outName
+      );
+    } else {
+      // -ss/-to as input options snap to keyframes; -t as output trims trailing blank
+      const toTime = loopOut.toFixed(3);
+      await ffmpegInstance.run(
+        '-ss', ss,
+        '-to', toTime,
+        '-i', inName,
+        '-t', dur,
+        '-map', '0:v:0',
+        '-map', '0:a:0?',
+        '-c', 'copy',
+        outName
+      );
+    }
+
+    if (exportCancelled) { exportOverlay.classList.remove('show'); return; }
+
+    exportStatus.textContent = '輸出中…';
+    exportProgressF.style.width = '95%';
+
+    const mimeType = outExt === 'mov' ? 'video/quicktime'
+                   : outExt === 'mp4' ? 'video/mp4'
+                   : 'video/' + outExt;
+    const data = ffmpegInstance.FS('readFile', outName);
+    const blob = new Blob([data.buffer], { type: mimeType });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    const base = currentFile.name.replace(/\.[^.]+$/, '') || 'clip';
+    a.href = url;
+    a.download = `${base}_clip_${ss.replace('.','_')}.${outExt}`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+
+    try { ffmpegInstance.FS('unlink', inName); } catch(e) {}
+    try { ffmpegInstance.FS('unlink', outName); } catch(e) {}
+
+    exportProgressF.style.width = '100%';
+    exportStatus.textContent = '完成！';
+    setTimeout(() => exportOverlay.classList.remove('show'), 1500);
+    showToast('剪輯完成');
+
+  } catch(err) {
+    exportOverlay.classList.remove('show');
+    showToast('剪輯失敗：' + (err.message || err));
+  }
+});
+
+exportCancelBtn.addEventListener('click', () => {
+  exportCancelled = true;
+  if (ffmpegInstance) { try { ffmpegInstance.exit(); } catch(e) {} }
+  ffmpegInstance = null;
+  ffmpegLoaded = false;
+  exportOverlay.classList.remove('show');
+  showToast('已取消');
+});
+
+// ── Convert only (no clip, -c copy) ──
+document.getElementById('loop-convert').addEventListener('click', async e => {
+  e.stopPropagation();
+  if (!currentFile) { showToast('沒有影片檔案'); return; }
+
+  const formatSel = document.getElementById('export-format').value;
+  const srcExt = currentFile.name.split('.').pop().toLowerCase();
+  const outExt = formatSel === 'original' ? srcExt : formatSel;
+
+  if (outExt === srcExt) {
+    showToast('格式相同，無需轉換'); return;
+  }
+
+  const base = currentFile.name.replace(/\.[^.]+$/, '') || 'video';
+
+  // iPhone MOV ↔ MP4: both are ISOBMFF containers — just rebrand, no FFmpeg needed
+  const isISOSwap = (srcExt === 'mov' && outExt === 'mp4') ||
+                    (srcExt === 'mp4' && outExt === 'mov');
+  if (isISOSwap) {
+    const mimeType = outExt === 'mp4' ? 'video/mp4' : 'video/quicktime';
+    const blob = new Blob([currentFile], { type: mimeType });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = `${base}.${outExt}`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+    showToast(`轉換完成 → ${outExt.toUpperCase()}`);
+    return;
+  }
+
+  // Other format conversions: use FFmpeg
+  exportCancelled = false;
+  exportOverlay.classList.add('show');
+  exportStatus.textContent = '準備中…';
+  exportProgressF.style.width = '0%';
+
+  try {
+    const { createFFmpeg, fetchFile } = FFmpeg;
+
+    if (!ffmpegInstance) {
+      ffmpegInstance = createFFmpeg({
+        log: false,
+        corePath: window.location.origin + '/ffmpeg/ffmpeg-core.js',
+      });
+    }
+    if (!ffmpegLoaded) {
+      exportStatus.textContent = '載入 FFmpeg…（首次約需 30 秒）';
+      await ffmpegInstance.load();
+      ffmpegLoaded = true;
+    }
+
+    if (exportCancelled) { exportOverlay.classList.remove('show'); return; }
+
+    exportStatus.textContent = '寫入檔案…';
+    exportProgressF.style.width = '10%';
+
+    const inName = 'input.' + srcExt;
+    ffmpegInstance.FS('writeFile', inName, await fetchFile(currentFile));
+
+    if (exportCancelled) { exportOverlay.classList.remove('show'); return; }
+
+    exportStatus.textContent = `轉換 ${srcExt.toUpperCase()} → ${outExt.toUpperCase()}…`;
+    exportProgressF.style.width = '20%';
+
+    const outName = 'output.' + outExt;
+    await ffmpegInstance.run(
+      '-i', inName,
+      '-c', 'copy',
+      '-movflags', '+faststart',
+      outName
+    );
+
+    if (exportCancelled) { exportOverlay.classList.remove('show'); return; }
+
+    exportProgressF.style.width = '95%';
+    exportStatus.textContent = '輸出中…';
+
+    const mimeType = outExt === 'mov' ? 'video/quicktime' : 'video/mp4';
+    const data = ffmpegInstance.FS('readFile', outName);
+    const blob = new Blob([data.buffer], { type: mimeType });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = `${base}.${outExt}`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+
+    try { ffmpegInstance.FS('unlink', inName); } catch(e) {}
+    try { ffmpegInstance.FS('unlink', outName); } catch(e) {}
+
+    exportProgressF.style.width = '100%';
+    exportStatus.textContent = '完成！';
+    setTimeout(() => exportOverlay.classList.remove('show'), 1500);
+    showToast(`轉換完成 → ${outExt.toUpperCase()}`);
+
+  } catch(err) {
+    exportOverlay.classList.remove('show');
+    showToast('轉換失敗：' + (err.message || err));
+  }
+});
 </script>
-
 </body>
 </html>
